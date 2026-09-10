@@ -94,6 +94,25 @@ skillyfiy --mcp /path/to/claude_desktop_config.json
 skillyfiy --help
 ```
 
+## 🗑️ Uninstallation
+
+Because Skillyfiy is a single, zero-dependency static binary that leaves no background daemons or hidden system directories, uninstalling it is instant:
+
+### Termux (Android):
+```bash
+rm -f $PREFIX/bin/skillyfiy
+```
+
+### Linux / macOS:
+```bash
+rm -f /usr/local/bin/skillyfiy ~/.local/bin/skillyfiy $(go env GOPATH 2>/dev/null)/bin/skillyfiy
+```
+
+### Optional (Remove Cloned Source):
+```bash
+rm -rf ~/skillyfiy
+```
+
 ## 📄 License
 
 Released under the [MIT License](LICENSE).
