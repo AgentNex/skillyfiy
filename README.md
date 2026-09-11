@@ -16,15 +16,15 @@
 Accumulating hundreds of agent skills and MCP servers pollutes context windows, degrades reasoning performance, and inflates system prompt token costs. **Skillyfiy** provides an interactive, split-pane Terminal User Interface (TUI) designed to browse, inspect, and bulk-prune agent overhead with sub-millisecond responsiveness.
 
 ```
-┌── SKILLYFIY v0.1.0 ────────────────────────────┬───────────────────────────────┐
-│ / Search: [ scraper                          ] │ INSPECTOR                     │
+┌── SKILLYFIY v0.2.0 ────────────────────────────┬───────────────────────────────┐
+│ / Search: [ scraper           ] [Sort] [Filter]│ INSPECTOR                     │
 ├────────────────────────────────────────────────┼───────────────────────────────┤
 │ ▶ [✓] [SKILL] web_scraper.py           1.2 KB  │ Target: web_scraper.py        │
 │   [ ] [MCP]   mcp-server-playwright   14.8 KB  │ Type:   Agent Skill (Python)  │
 │   [✓] [SKILL] doc_indexer.md           0.8 KB  │ System Tokens: ~840 tokens    │
 ├────────────────────────────────────────────────┴───────────────────────────────┤
 │ [2/1,542 Selected]  •  ~2,040 Tokens Reclaimed                                 │
-│ [Space] Toggle • [s] Span Range • [Ctrl+A] All • [Enter] Purge • [Ctrl+Q] Quit │
+│ [Space] Toggle • [s/v] Span • [Ctrl+S] Sort • [Ctrl+T] Filter • [Enter] Purge  │
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
