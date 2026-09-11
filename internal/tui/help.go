@@ -11,7 +11,7 @@ import (
 func RenderHelpModal(width, height int) string {
 	var b strings.Builder
 
-	title := "⚡ SKILLYFIY KEYBINDINGS & CONTROLS"
+	title := "⚡ SKILLYFIY KEYBINDINGS & CONTROLS [sky]"
 	b.WriteString(BannerStyle.Render(title) + "\n")
 
 	modalW := width - 4

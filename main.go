@@ -15,13 +15,13 @@ import (
 	"skillyfiy/internal/tui"
 )
 
-// Version is injected at build time via -ldflags="-X main.Version=v0.2.1"
-var Version = "v0.2.1"
+// Version is injected at build time via -ldflags="-X main.Version=v0.2.2"
+var Version = "v0.2.2"
 
 func main() {
 	cfg, isVersion := config.ParseFlags()
 	if isVersion {
-		fmt.Printf("skillyfiy %s (%s/%s, pure Go, zero-cgo)\n", Version, runtime.GOOS, runtime.GOARCH)
+		fmt.Printf("sky (skillyfiy) %s (%s/%s, pure Go, zero-cgo)\n", Version, runtime.GOOS, runtime.GOARCH)
 		os.Exit(0)
 	}
 
@@ -49,8 +49,8 @@ func main() {
 		fmt.Printf("\nNo agent skills or MCP servers were discovered in the configured paths:\n")
 		fmt.Printf("  • Skills Directory : %s\n", cfg.SkillsPath)
 		fmt.Printf("  • MCP Settings     : %s\n\n", cfg.MCPPath)
-		fmt.Printf("You can point Skillyfiy to custom locations using flags:\n")
-		fmt.Printf("  skillyfiy --skills /path/to/skills --mcp /path/to/settings.json\n\n")
+		fmt.Printf("You can point to custom locations using flags:\n")
+		fmt.Printf("  sky --skills /path/to/skills --mcp /path/to/settings.json\n\n")
 		return
 	}
 

@@ -16,7 +16,7 @@
 Accumulating hundreds of agent skills and MCP servers pollutes context windows, degrades reasoning performance, and inflates system prompt token costs. **Skillyfiy** provides an interactive, split-pane Terminal User Interface (TUI) designed to browse, inspect, and bulk-prune agent overhead with sub-millisecond responsiveness.
 
 ```
-┌── SKILLYFIY v0.2.1 ────────────────────────────┬───────────────────────────────┐
+┌── SKILLYFIY [sky] v0.2.2 ──────────────────────┬───────────────────────────────┐
 │ / Search: [ scraper           ] [Sort] [Filter]│ INSPECTOR                     │
 ├────────────────────────────────────────────────┼───────────────────────────────┤
 │ ▶ [✓] [SKILL] web_scraper.py           1.2 KB  │ Target: web_scraper.py        │
@@ -45,20 +45,20 @@ go install github.com/AgentNex/skillyfiy@latest
 ### 🤖 Install via AI Agent
 
 <details>
-<summary>📋 <b>Click to reveal prompt for installing Skillyfiy using your AI agent</b></summary>
+<summary>📋 <b>Click to reveal prompt for installing Skillyfiy (sky) using your AI agent</b></summary>
 
 Hover over the block below and click the top-right copy icon to copy the prompt:
 
 ```
-Install the Skillyfiy CLI tool on my system:
+Install the Skillyfiy (sky) CLI tool on my system:
 
 1. Check if Go is installed (`go version`) or use curl to run the installer:
    curl -fsSL https://raw.githubusercontent.com/AgentNex/skillyfiy/main/install.sh | bash
 2. If Go is available, compile from source:
    go install github.com/AgentNex/skillyfiy@latest
 3. Verify the installation by running:
-   skillyfiy -v
-4. Provide a quick summary of the available flags and how to start the tool.
+   sky -v
+4. Provide a quick summary of the available flags and how to start the tool with 'sky'.
 ```
 
 </details>
@@ -78,40 +78,42 @@ Install the Skillyfiy CLI tool on my system:
 | `Tab` | Switch focus between List pane and Inspector pane |
 | `Enter` | Review and confirm purge of selected items |
 | `i` / `?` | **Toggle Help Modal overlay** showing all controls |
-| `Ctrl+Q` / `Esc` | Exit Skillyfiy |
+| `Ctrl+Q` / `Esc` | Exit sky |
 
 ## ⚙️ CLI Flags
 
+Launch directly with `sky` (or `skillyfiy`):
+
 ```bash
 # Launch interactive TUI
-skillyfiy
+sky
 
 # Print version information
-skillyfiy -v
-skillyfiy --version
+sky -v
+sky --version
 
 # Specify custom skills directory
-skillyfiy --skills /path/to/custom/skills
+sky --skills /path/to/custom/skills
 
 # Specify custom MCP configuration file
-skillyfiy --mcp /path/to/claude_desktop_config.json
+sky --mcp /path/to/claude_desktop_config.json
 
 # Display help menu
-skillyfiy --help
+sky --help
 ```
 
 ## 🗑️ Uninstallation
 
-Because Skillyfiy is a single, zero-dependency static binary that leaves no background daemons or hidden system directories, uninstalling it is instant:
+Because Skillyfiy (`sky`) is a single, zero-dependency static binary that leaves no background daemons or hidden system directories, uninstalling it is instant:
 
 ### Termux (Android):
 ```bash
-rm -f $PREFIX/bin/skillyfiy
+rm -f $PREFIX/bin/sky $PREFIX/bin/skillyfiy
 ```
 
 ### Linux / macOS:
 ```bash
-rm -f /usr/local/bin/skillyfiy ~/.local/bin/skillyfiy $(go env GOPATH 2>/dev/null)/bin/skillyfiy
+rm -f /usr/local/bin/sky /usr/local/bin/skillyfiy ~/.local/bin/sky ~/.local/bin/skillyfiy $(go env GOPATH 2>/dev/null)/bin/skillyfiy
 ```
 
 ### Optional (Remove Cloned Source):

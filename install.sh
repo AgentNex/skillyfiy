@@ -32,22 +32,33 @@ fi
 # 4. Fetch Latest Release Version from GitHub API
 TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 if [ -z "$TAG" ]; then
-  TAG="v0.2.1"
+  TAG="v0.2.2"
 fi
 
 TARBALL="skillyfiy_${OS}_${ARCH}.tar.gz"
 URL="https://github.com/$REPO/releases/download/$TAG/$TARBALL"
 
-echo "➜ Downloading Skillyfiy ${TAG} for ${OS}/${ARCH}..."
+echo "➜ Downloading Skillyfiy (${TAG}) for ${OS}/${ARCH}..."
 TMP_DIR="$(mktemp -d)"
 
 if curl -sL "$URL" | tar -xz -C "$TMP_DIR" 2>/dev/null; then
-  mv "$TMP_DIR/skillyfiy" "$INSTALL_DIR/skillyfiy"
-  chmod +x "$INSTALL_DIR/skillyfiy"
+  if [ -f "$TMP_DIR/sky" ]; then
+    mv "$TMP_DIR/sky" "$INSTALL_DIR/sky"
+  elif [ -f "$TMP_DIR/skillyfiy" ]; then
+    mv "$TMP_DIR/skillyfiy" "$INSTALL_DIR/sky"
+  fi
+  chmod +x "$INSTALL_DIR/sky"
+  ln -sf "$INSTALL_DIR/sky" "$INSTALL_DIR/skillyfiy"
   rm -rf "$TMP_DIR"
-  echo "✓ Successfully installed Skillyfiy to $INSTALL_DIR/skillyfiy"
-  echo "➜ Run 'skillyfiy --version' or 'skillyfiy' to start."
+  echo "✓ Successfully installed to $INSTALL_DIR/sky (alias: skillyfiy)"
+  echo "➜ Run 'sky' or 'sky -v' to start."
 else
   echo "Falling back to local go install..."
   go install "github.com/$REPO@latest"
+  GOPATH_BIN="$(go env GOPATH 2>/dev/null)/bin"
+  if [ -f "$GOPATH_BIN/skillyfiy" ]; then
+    ln -sf "$GOPATH_BIN/skillyfiy" "$INSTALL_DIR/sky" 2>/dev/null || cp -f "$GOPATH_BIN/skillyfiy" "$INSTALL_DIR/sky"
+    echo "✓ Successfully installed 'sky' to $INSTALL_DIR/sky"
+    echo "➜ Run 'sky' to start."
+  fi
 fi

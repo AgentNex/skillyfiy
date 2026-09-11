@@ -116,9 +116,9 @@ func ParseFlags() (*Config, bool) {
 	versionLongFlag := flag.Bool("version", false, "Print current version and exit")
 
 	flag.Usage = func() {
-		fmt.Printf("Skillyfiy CLI — High-Performance Agent Skill & MCP Pruner\n\n")
+		fmt.Printf("Skillyfiy (sky) — High-Performance Agent Skill & MCP Pruner\n\n")
 		fmt.Printf("Usage:\n")
-		fmt.Printf("  skillyfiy [flags]\n\n")
+		fmt.Printf("  sky [flags]   (or: skillyfiy [flags])\n\n")
 		fmt.Printf("Flags:\n")
 		fmt.Printf("  -v, --version        Print version information and exit\n")
 		fmt.Printf("  --skills <path>      Custom path to skills directory\n")

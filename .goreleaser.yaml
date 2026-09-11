@@ -6,7 +6,9 @@ before:
     - go mod tidy
 
 builds:
-  - env:
+  - id: sky
+    binary: sky
+    env:
       - CGO_ENABLED=0
     goos:
       - linux

@@ -13,7 +13,7 @@ const ASCIIBanner = `  ___ _  _____ _    _   __  _____ ___ __   __
  |___/_|\_\___|____|____|/_/ |_| |___|  |_|  `
 
 // SubtitleText provides context for the tool.
-const SubtitleText = "Terminal AI Agent Skill & MCP Context Overhead Optimizer"
+const SubtitleText = "Terminal AI Agent Skill & MCP Context Overhead Optimizer [sky]"
 
 // RenderBanner renders the stylized header, adapting dynamically to terminal width.
 func RenderBanner(width int) string {
