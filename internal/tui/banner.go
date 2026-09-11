@@ -22,8 +22,8 @@ var BannerGradient = []lipgloss.TerminalColor{
 
 // Block letter rows for "SKILLYFIY" (3 cells per letter, 35 columns total).
 var (
-	bannerLettersRow0 = []string{"█▀▀", "█▀▄", "▀█▀", "█  ", "█  ", "█ █", "█▀▀", "▀█▀", "█ █"}
-	bannerLettersRow1 = []string{"▄▄█", "█ █", "▄█▄", "█▄▄", "█▄▄", " █ ", "█  ", "▄█▄", " █ "}
+	bannerLettersRow0 = []string{"█▀▀", "█▄▀", "▀█▀", "█  ", "█  ", "█ █", "█▀▀", "▀█▀", "█ █"}
+	bannerLettersRow1 = []string{"▄▄█", "█▀▄", "▄█▄", "█▄▄", "█▄▄", " █ ", "█▀ ", "▄█▄", " █ "}
 )
 
 // SubtitleText provides context for the tool.

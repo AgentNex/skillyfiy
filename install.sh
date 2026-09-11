@@ -32,7 +32,7 @@ fi
 # 4. Fetch Latest Release Version from GitHub API
 TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 if [ -z "$TAG" ]; then
-  TAG="v0.2.3"
+  TAG="v0.2.4"
 fi
 
 TARBALL="skillyfiy_${OS}_${ARCH}.tar.gz"
