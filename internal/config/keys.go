@@ -12,6 +12,7 @@ type KeyMap struct {
 	FocusSearch  key.Binding
 	SwitchPane   key.Binding
 	CycleSort    key.Binding
+	CycleFilter  key.Binding
 	ConfirmPurge key.Binding
 	Quit         key.Binding
 	ForceQuit    key.Binding
@@ -22,11 +23,12 @@ var DefaultKeyMap = KeyMap{
 	CursorUp:     key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up")),
 	CursorDown:   key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
 	ToggleSelect: key.NewBinding(key.WithKeys(" ", "x"), key.WithHelp("space/x", "toggle")),
-	VisualRange:  key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "visual mode")),
+	VisualRange:  key.NewBinding(key.WithKeys("v", "s"), key.WithHelp("v/s", "visual mode")),
 	SelectAll:    key.NewBinding(key.WithKeys("ctrl+a"), key.WithHelp("ctrl+a", "select all")),
 	FocusSearch:  key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 	SwitchPane:   key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch pane")),
-	CycleSort:    key.NewBinding(key.WithKeys("f1", "ctrl+s"), key.WithHelp("ctrl+s", "cycle sort")),
+	CycleSort:    key.NewBinding(key.WithKeys("f1", "ctrl+s"), key.WithHelp("ctrl+s/f1", "cycle sort")),
+	CycleFilter:  key.NewBinding(key.WithKeys("f2", "ctrl+t"), key.WithHelp("ctrl+t/f2", "cycle filter")),
 	ConfirmPurge: key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "purge")),
 	Quit:         key.NewBinding(key.WithKeys("ctrl+q", "esc"), key.WithHelp("ctrl+q/esc", "exit")),
 	ForceQuit:    key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "force quit")),

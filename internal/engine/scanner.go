@@ -79,6 +79,8 @@ func ScanSkills(skillsDir string) ([]model.AgentItem, error) {
 
 		description, rawPreview, lineCount := extractSkillPreview(path)
 
+		modTime := fi.ModTime()
+
 		item := model.AgentItem{
 			ID:          "skill:" + rel,
 			Name:        rel,
@@ -87,6 +89,10 @@ func ScanSkills(skillsDir string) ([]model.AgentItem, error) {
 			Description: description,
 			Tokens:      tokens,
 			Size:        size,
+			ModTime:     modTime,
+			NameLower:   strings.ToLower(rel),
+			DescLower:   strings.ToLower(description),
+			PathLower:   strings.ToLower(path),
 			Details: map[string]string{
 				"Category":  "Agent Skill",
 				"Relative":  rel,
@@ -95,7 +101,7 @@ func ScanSkills(skillsDir string) ([]model.AgentItem, error) {
 				"Size":      model.FormatBytes(size),
 				"Lines":     fmt.Sprintf("%d", lineCount),
 				"Tokens":    fmt.Sprintf("~%d", tokens),
-				"Modified":  fi.ModTime().Format("2006-01-02 15:04:05"),
+				"Modified":  modTime.Format("2006-01-02 15:04:05"),
 			},
 			RawPreview: rawPreview,
 			Selected:   false,

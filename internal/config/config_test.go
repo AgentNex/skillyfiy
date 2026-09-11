@@ -48,6 +48,9 @@ func TestKeyMapBindings(t *testing.T) {
 	if len(km.CycleSort.Keys()) == 0 {
 		t.Errorf("CycleSort keys empty")
 	}
+	if len(km.CycleFilter.Keys()) == 0 {
+		t.Errorf("CycleFilter keys empty")
+	}
 	if len(km.ConfirmPurge.Keys()) == 0 {
 		t.Errorf("ConfirmPurge keys empty")
 	}

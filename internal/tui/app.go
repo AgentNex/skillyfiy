@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/sahilm/fuzzy"
+	"github.com/muesli/reflow/truncate"
 
 	"skillyfiy/internal/config"
 	"skillyfiy/internal/engine"
@@ -40,6 +40,7 @@ type AppModel struct {
 	width        int
 	height       int
 	sortMode     model.SortMode
+	filterType   model.FilterType
 	visualAnchor int
 
 	allItems    []model.AgentItem
@@ -82,9 +83,10 @@ func NewAppModel(cfg *config.Config, items []model.AgentItem) AppModel {
 	inspector := NewInspector(50, 20)
 
 	selectedMap := make(map[string]bool)
-	for _, it := range items {
-		if it.Selected {
-			selectedMap[it.ID] = true
+	for i := range items {
+		items[i].EnsureCache()
+		if items[i].Selected {
+			selectedMap[items[i].ID] = true
 		}
 	}
 
@@ -95,7 +97,8 @@ func NewAppModel(cfg *config.Config, items []model.AgentItem) AppModel {
 		focusedPane:  paneList,
 		width:        80,
 		height:       24,
-		sortMode:     model.SortAlphabetical,
+		sortMode:     model.SortNewest,
+		filterType:   model.FilterAll,
 		visualAnchor: visualAnchor,
 		allItems:     items,
 		selectedMap:  selectedMap,
@@ -105,6 +108,7 @@ func NewAppModel(cfg *config.Config, items []model.AgentItem) AppModel {
 		delegate:     delegate,
 	}
 
+	app.recalculateSizes()
 	app.updateListItems()
 	return app
 }
@@ -184,7 +188,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, textinput.Blink
 
 		case key.Matches(msg, m.keys.CycleSort):
-			m.sortMode = (m.sortMode + 1) % 3
+			m.sortMode = (m.sortMode + 1) % 6
+			m.updateListItems()
+			return m, nil
+
+		case key.Matches(msg, m.keys.CycleFilter):
+			m.filterType = (m.filterType + 1) % 3
 			m.updateListItems()
 			return m, nil
 
@@ -231,6 +240,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commitVisualRange()
 				return m, nil
 			}
+			m.toggleVisualMode()
+			return m, nil
 
 		default:
 			var cmd tea.Cmd
@@ -247,8 +258,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// View renders the TUI layout.
+// View renders the TUI layout with strict zero-wrapping guards.
 func (m AppModel) View() string {
+	if m.width < 32 || m.height < 10 {
+		return fmt.Sprintf("Terminal too small (%dx%d).\nPlease enlarge screen.\n", m.width, m.height)
+	}
+
 	if m.state == stateConfirm {
 		return RenderConfirmModal(m.allItems, m.width, m.height, m.cfg.DryRun)
 	}
@@ -257,105 +272,238 @@ func (m AppModel) View() string {
 
 	// 1. Header Banner
 	bannerStr := RenderBanner(m.width)
-	b.WriteString(bannerStr + "\n\n")
+	b.WriteString(bannerStr + "\n")
 
-	// 2. Search Prompt Box with active Sort Badge
-	sortBadge := SortBadgeStyle.Render(m.sortMode.String())
-	searchPrompt := m.searchInput.View()
-	availSearchWidth := m.width - lipgloss.Width(sortBadge) - 8
-	if availSearchWidth < 20 {
-		availSearchWidth = 20
+	// 2. Search Prompt Box with Sort and Filter Badges
+	isNarrow := m.width < 90
+	var sortStr, filterStr string
+	if isNarrow {
+		sortStr = m.sortMode.Compact()
+		filterStr = m.filterType.Compact()
+	} else {
+		sortStr = m.sortMode.String()
+		filterStr = m.filterType.String()
 	}
-	searchBoxContent := lipgloss.JoinHorizontal(lipgloss.Center,
-		lipgloss.NewStyle().Width(availSearchWidth).Render(searchPrompt),
-		sortBadge,
-	)
-	b.WriteString(SearchBoxStyle.Width(m.width-4).Render(searchBoxContent) + "\n")
 
-	// 3. Dual-Column Split View
+	sortBadge := SortBadgeStyle.Render(sortStr)
+	filterBadge := FilterBadgeStyle.Render(filterStr)
+	badges := lipgloss.JoinHorizontal(lipgloss.Center, sortBadge, " ", filterBadge)
+
+	boxWidth := m.width - 6
+	if boxWidth < 20 {
+		boxWidth = 20
+	}
+	availSearchWidth := boxWidth - lipgloss.Width(badges) - 3
+	if availSearchWidth < 8 {
+		availSearchWidth = 8
+	}
+
+	searchBoxContent := lipgloss.JoinHorizontal(lipgloss.Center,
+		lipgloss.NewStyle().Width(availSearchWidth).Render(m.searchInput.View()),
+		badges,
+	)
+	b.WriteString(SearchBoxStyle.Width(boxWidth).Render(searchBoxContent) + "\n")
+
+	// 3. Middle Content (Split View or Stacked/Toggle View)
 	listStyle := LeftPaneStyle
 	if m.focusedPane == paneList {
 		listStyle = LeftPaneFocusedStyle
 	}
 
-	leftView := listStyle.Width(m.list.Width()).Height(m.list.Height()).Render(m.list.View())
-	rightView := m.inspector.View()
+	listInnerH, _, isStacked := m.calculateContentHeights()
 
-	splitView := lipgloss.JoinHorizontal(lipgloss.Top, leftView, rightView)
-	b.WriteString(splitView + "\n")
+	var mainContent string
+	if m.width >= 90 {
+		leftView := listStyle.Width(m.list.Width()).Height(listInnerH).Render(m.list.View())
+		rightView := m.inspector.View()
+		mainContent = lipgloss.JoinHorizontal(lipgloss.Top, leftView, rightView)
+	} else {
+		if isStacked {
+			leftView := listStyle.Width(m.list.Width()).Height(listInnerH).Render(m.list.View())
+			rightView := m.inspector.View()
+			mainContent = lipgloss.JoinVertical(lipgloss.Left, leftView, rightView)
+		} else {
+			if m.focusedPane == paneInspector {
+				mainContent = m.inspector.View()
+			} else {
+				mainContent = listStyle.Width(m.list.Width()).Height(listInnerH).Render(m.list.View())
+			}
+		}
+	}
+	b.WriteString(mainContent + "\n")
 
 	// 4. Status Footer
 	footer := m.renderFooter()
 	b.WriteString(footer)
 
-	return b.String()
+	// Final pass: clamp lines and prevent any line-wrapping jitter
+	rawView := b.String()
+	lines := strings.Split(rawView, "\n")
+	var cleanLines []string
+	maxH := m.height
+	if maxH <= 0 {
+		maxH = 24
+	}
+	maxW := m.width
+	if maxW <= 0 {
+		maxW = 80
+	}
+
+	for i, line := range lines {
+		if i >= maxH {
+			break
+		}
+		if lipgloss.Width(line) >= maxW {
+			line = truncate.StringWithTail(line, uint(maxW-1), "")
+		}
+		cleanLines = append(cleanLines, line)
+	}
+
+	return strings.Join(cleanLines, "\n")
+}
+
+func (m *AppModel) calculateContentHeights() (listInner, inspInner int, isStacked bool) {
+	bannerH := BannerHeight(m.width)
+	searchH := 3
+	footerH := 1
+	availMainOuter := m.height - bannerH - searchH - footerH
+	if availMainOuter < 4 {
+		availMainOuter = 4
+	}
+
+	if m.width >= 90 {
+		// Dual-column split view
+		innerH := availMainOuter - 2
+		if innerH < 3 {
+			innerH = 3
+		}
+		return innerH, innerH, false
+	}
+
+	// Narrow / mobile mode (<90 cols)
+	if availMainOuter >= 14 {
+		// Stacked mode: List on top, Inspector on bottom
+		listOuter := int(float64(availMainOuter) * 0.55)
+		if listOuter < 7 {
+			listOuter = 7
+		}
+		inspOuter := availMainOuter - listOuter
+		if inspOuter < 5 {
+			inspOuter = 5
+		}
+		lInner := listOuter - 2
+		if lInner < 2 {
+			lInner = 2
+		}
+		iInner := inspOuter - 2
+		if iInner < 2 {
+			iInner = 2
+		}
+		return lInner, iInner, true
+	}
+
+	// Single pane toggle mode
+	singleInner := availMainOuter - 2
+	if singleInner < 2 {
+		singleInner = 2
+	}
+	return singleInner, singleInner, false
 }
 
 func (m *AppModel) renderFooter() string {
 	if m.visualAnchor != -1 {
-		msg := fmt.Sprintf(" -- VISUAL RANGE (Pinned at #%d) -- Move cursor with ↑/↓/j/k and tap 'v' or 's' to lock selection. Tap Esc to cancel. ", m.visualAnchor+1)
-		return FooterVisualModeStyle.Width(m.width).Render(msg)
+		msg := fmt.Sprintf(" -- VISUAL RANGE (Pinned #%d) -- Tap 'v' or 's' to lock, Esc to cancel. ", m.visualAnchor+1)
+		return truncate.StringWithTail(FooterVisualModeStyle.Render(msg), uint(m.width-1), "")
 	}
 
 	selectedCount := m.getSelectedCount()
 	reclaimedTokens := m.getReclaimedTokens()
 
-	leftHints := "[↑/↓/j/k] Move • [Space/x] Toggle • [v] Visual • [Ctrl+A] Select All • [/] Search • [Tab] Pane • [Ctrl+S] Sort • [Enter] Purge • [Ctrl+Q] Quit"
+	var leftHints string
+	switch {
+	case m.width >= 115:
+		leftHints = "[↑/↓] Move • [Space] Mark • [v/s] Span • [Ctrl+A] All • [/] Search • [Tab] Pane • [Ctrl+S] Sort • [Ctrl+T] Filter • [Enter] Purge • [Ctrl+Q] Quit"
+	case m.width >= 90:
+		leftHints = "[↑/↓] Move • [Space] Mark • [v/s] Span • [Tab] Pane • [Ctrl+S] Sort • [Ctrl+T] Filter • [Enter] Purge • [Ctrl+Q] Quit"
+	case m.width >= 65:
+		leftHints = "[↑/↓] Move • [Space] Mark • [Tab] Pane • [Ctrl+S] Sort • [Ctrl+T] Filter • [Enter] Purge"
+	case m.width >= 45:
+		leftHints = "[Space] Mark • [Tab] Pane • [Ctrl+S] Sort • [Enter] Purge"
+	default:
+		leftHints = "[Space] Mark • [Enter] Purge"
+	}
 	leftFormatted := FooterStyle.Render(leftHints)
 
-	statusInfo := fmt.Sprintf("Selected: %s/%d  Reclaimed: %s",
-		FooterSelectedCountStyle.Render(fmt.Sprintf("%d", selectedCount)),
-		len(m.allItems),
-		FooterReclaimedStyle.Render(fmt.Sprintf("~%d tk", reclaimedTokens)),
-	)
+	var statusInfo string
+	if m.width >= 65 {
+		statusInfo = fmt.Sprintf("Selected: %s/%d  Reclaimed: %s",
+			FooterSelectedCountStyle.Render(fmt.Sprintf("%d", selectedCount)),
+			len(m.allItems),
+			FooterReclaimedStyle.Render(fmt.Sprintf("~%d tk", reclaimedTokens)),
+		)
+	} else {
+		statusInfo = fmt.Sprintf("%s/%d (~%dtk)",
+			FooterSelectedCountStyle.Render(fmt.Sprintf("%d", selectedCount)),
+			len(m.allItems),
+			reclaimedTokens,
+		)
+	}
 	rightFormatted := lipgloss.NewStyle().Padding(0, 1).Render(statusInfo)
 
-	availGap := m.width - lipgloss.Width(leftFormatted) - lipgloss.Width(rightFormatted)
+	availGap := m.width - lipgloss.Width(leftFormatted) - lipgloss.Width(rightFormatted) - 1
 	if availGap < 1 {
 		availGap = 1
 	}
 	gap := strings.Repeat(" ", availGap)
 
-	return leftFormatted + gap + rightFormatted
+	line := leftFormatted + gap + rightFormatted
+	if lipgloss.Width(line) >= m.width {
+		line = truncate.StringWithTail(line, uint(m.width-1), "")
+	}
+	return line
 }
 
 func (m *AppModel) recalculateSizes() {
-	bannerH := BannerHeight() + 1
-	searchH := 3
-	footerH := 2
-	availableH := m.height - bannerH - searchH - footerH
-	if availableH < 8 {
-		availableH = 8
-	}
+	listInnerH, inspInnerH, _ := m.calculateContentHeights()
 
-	// 45% left, 55% right
-	leftW := int(float64(m.width) * 0.45)
-	if leftW < 30 {
-		leftW = 30
-	}
-	rightW := m.width - leftW - 4
-	if rightW < 30 {
-		rightW = 30
-	}
+	if m.width >= 90 {
+		// Dual-Column Split View
+		availInner := m.width - 8
+		if availInner < 40 {
+			availInner = 40
+		}
+		leftW := int(float64(availInner) * 0.45)
+		if leftW < 30 {
+			leftW = 30
+		}
+		rightW := availInner - leftW
+		if rightW < 30 {
+			rightW = 30
+		}
 
-	m.list.SetSize(leftW, availableH)
-	m.inspector.SetSize(rightW, availableH)
+		m.list.SetSize(leftW, listInnerH)
+		m.inspector.SetSize(rightW, inspInnerH)
+	} else {
+		// Responsive Mobile Mode (<90 cols)
+		contentW := m.width - 4
+		if contentW < 16 {
+			contentW = 16
+		}
+
+		m.list.SetSize(contentW, listInnerH)
+		m.inspector.SetSize(contentW-2, inspInnerH)
+	}
 }
 
 func (m *AppModel) updateListItems() {
-	// Sort all items
-	sorted := make([]model.AgentItem, len(m.allItems))
-	copy(sorted, m.allItems)
-
-	sortItems(sorted, m.sortMode)
-
-	// Sync selection states
-	for i := range sorted {
-		sorted[i].Selected = m.selectedMap[sorted[i].ID]
+	// Sync selection states into allItems
+	for i := range m.allItems {
+		m.allItems[i].EnsureCache()
+		m.allItems[i].Selected = m.selectedMap[m.allItems[i].ID]
 	}
 
-	// Apply fuzzy search
-	filtered := filterAgentItems(sorted, m.searchInput.Value())
+	// Filter and sort items according to query, sortMode, and filterType
+	filtered := filterAndSortItems(m.allItems, m.searchInput.Value(), m.sortMode, m.filterType)
 
 	listItems := make([]list.Item, len(filtered))
 	for i, it := range filtered {
@@ -535,45 +683,125 @@ func (m *AppModel) getReclaimedTokens() int {
 	return tokens
 }
 
-// Helpers for sorting and fuzzy filtering
+// Helpers for sorting and tiered search filtering
+
 func sortItems(items []model.AgentItem, mode model.SortMode) {
 	switch mode {
-	case model.SortAlphabetical:
+	case model.SortNewest:
 		sort.Slice(items, func(i, j int) bool {
-			return strings.ToLower(items[i].Name) < strings.ToLower(items[j].Name)
-		})
-	case model.SortTokenWeight:
-		sort.Slice(items, func(i, j int) bool {
-			if items[i].Tokens == items[j].Tokens {
-				return strings.ToLower(items[i].Name) < strings.ToLower(items[j].Name)
+			if !items[i].ModTime.Equal(items[j].ModTime) {
+				return items[i].ModTime.After(items[j].ModTime)
 			}
-			return items[i].Tokens > items[j].Tokens
+			return items[i].NameLower < items[j].NameLower
 		})
-	case model.SortItemType:
+	case model.SortOldest:
 		sort.Slice(items, func(i, j int) bool {
-			if items[i].Type == items[j].Type {
-				return strings.ToLower(items[i].Name) < strings.ToLower(items[j].Name)
+			if !items[i].ModTime.Equal(items[j].ModTime) {
+				return items[i].ModTime.Before(items[j].ModTime)
 			}
-			return items[i].Type == model.TypeSkill && items[j].Type == model.TypeMCP
+			return items[i].NameLower < items[j].NameLower
+		})
+	case model.SortLargest:
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].Tokens != items[j].Tokens {
+				return items[i].Tokens > items[j].Tokens
+			}
+			return items[i].NameLower < items[j].NameLower
+		})
+	case model.SortSmallest:
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].Tokens != items[j].Tokens {
+				return items[i].Tokens < items[j].Tokens
+			}
+			return items[i].NameLower < items[j].NameLower
+		})
+	case model.SortAZ:
+		sort.Slice(items, func(i, j int) bool {
+			return items[i].NameLower < items[j].NameLower
+		})
+	case model.SortZA:
+		sort.Slice(items, func(i, j int) bool {
+			return items[i].NameLower > items[j].NameLower
 		})
 	}
 }
 
-type agentItemSource []model.AgentItem
+func filterAndSortItems(items []model.AgentItem, query string, sortMode model.SortMode, filterType model.FilterType) []model.AgentItem {
+	// 1. Type Filter
+	var typeFiltered []model.AgentItem
+	for _, it := range items {
+		switch filterType {
+		case model.FilterSkills:
+			if it.Type == model.TypeSkill {
+				typeFiltered = append(typeFiltered, it)
+			}
+		case model.FilterMCP:
+			if it.Type == model.TypeMCP {
+				typeFiltered = append(typeFiltered, it)
+			}
+		default: // FilterAll
+			typeFiltered = append(typeFiltered, it)
+		}
+	}
 
-func (s agentItemSource) Len() int            { return len(s) }
-func (s agentItemSource) String(i int) string { return s[i].FilterValue() }
-
-func filterAgentItems(items []model.AgentItem, query string) []model.AgentItem {
-	cleanQuery := strings.TrimSpace(query)
+	cleanQuery := strings.ToLower(strings.TrimSpace(query))
 	if cleanQuery == "" {
-		return items
+		sortItems(typeFiltered, sortMode)
+		return typeFiltered
 	}
 
-	matches := fuzzy.FindFrom(cleanQuery, agentItemSource(items))
-	result := make([]model.AgentItem, len(matches))
-	for i, m := range matches {
-		result[i] = items[m.Index]
+	tokens := strings.Fields(cleanQuery)
+	var tier1, tier2, tier3 []model.AgentItem
+
+	for _, it := range typeFiltered {
+		it.EnsureCache()
+
+		// Tier 1: Match in Name
+		matchName := true
+		for _, tok := range tokens {
+			if !strings.Contains(it.NameLower, tok) {
+				matchName = false
+				break
+			}
+		}
+		if matchName {
+			tier1 = append(tier1, it)
+			continue
+		}
+
+		// Tier 2: Match in Description
+		matchDesc := true
+		for _, tok := range tokens {
+			if !strings.Contains(it.DescLower, tok) && !strings.Contains(it.NameLower, tok) {
+				matchDesc = false
+				break
+			}
+		}
+		if matchDesc {
+			tier2 = append(tier2, it)
+			continue
+		}
+
+		// Tier 3: Match in Path
+		matchPath := true
+		for _, tok := range tokens {
+			if !strings.Contains(it.PathLower, tok) && !strings.Contains(it.DescLower, tok) && !strings.Contains(it.NameLower, tok) {
+				matchPath = false
+				break
+			}
+		}
+		if matchPath {
+			tier3 = append(tier3, it)
+		}
 	}
+
+	sortItems(tier1, sortMode)
+	sortItems(tier2, sortMode)
+	sortItems(tier3, sortMode)
+
+	result := make([]model.AgentItem, 0, len(tier1)+len(tier2)+len(tier3))
+	result = append(result, tier1...)
+	result = append(result, tier2...)
+	result = append(result, tier3...)
 	return result
 }

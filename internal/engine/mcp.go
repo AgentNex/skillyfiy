@@ -125,6 +125,10 @@ func ParseMCP(manifestPath string) ([]model.AgentItem, error) {
 			Description: description,
 			Tokens:      tokens,
 			Size:        size,
+			ModTime:     info.ModTime(),
+			NameLower:   strings.ToLower(serverName),
+			DescLower:   strings.ToLower(description),
+			PathLower:   strings.ToLower(absPath),
 			Details: map[string]string{
 				"Category":  "MCP Server",
 				"Server":    serverName,
@@ -134,6 +138,7 @@ func ParseMCP(manifestPath string) ([]model.AgentItem, error) {
 				"Manifest":  absPath,
 				"Size":      model.FormatBytes(size),
 				"Tokens":    fmt.Sprintf("~%d", tokens),
+				"Modified":  info.ModTime().Format("2006-01-02 15:04:05"),
 			},
 			RawPreview: rawServerJSON,
 			Selected:   false,

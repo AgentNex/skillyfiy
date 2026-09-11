@@ -114,7 +114,11 @@ func (i *InspectorModel) renderContent(item *model.AgentItem) string {
 		}
 	}
 
-	b.WriteString("\n" + SubtitleStyle.Render(strings.Repeat("─", i.Width-4)) + "\n\n")
+	dividerWidth := i.Width - 4
+	if dividerWidth < 2 {
+		dividerWidth = 2
+	}
+	b.WriteString("\n" + SubtitleStyle.Render(strings.Repeat("─", dividerWidth)) + "\n\n")
 
 	// 3. Source Preview
 	if item.Type == model.TypeSkill {
@@ -128,8 +132,12 @@ func (i *InspectorModel) renderContent(item *model.AgentItem) string {
 		previewText = "(Preview unavailable)"
 	}
 
+	wrapW := i.Width - 6
+	if wrapW < 10 {
+		wrapW = 10
+	}
 	// Wrap preview to avoid horizontal overrun
-	wrapped := wordwrap.String(previewText, i.Width-6)
+	wrapped := wordwrap.String(previewText, wrapW)
 	b.WriteString(InspectorCodeBlock.Render(wrapped))
 
 	return b.String()

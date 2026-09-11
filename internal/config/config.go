@@ -131,10 +131,12 @@ func ParseFlags() (*Config, bool) {
 		fmt.Printf("  s / v                Toggle Skillyfiy Span (Visual Range mode)\n")
 		fmt.Printf("  Ctrl+A               Toggle select all visible items\n")
 		fmt.Printf("  Tab                  Switch between List and Inspector pane\n")
-		fmt.Printf("  Ctrl+S / F1          Cycle sort mode (A-Z, Tokens, Type)\n")
+		fmt.Printf("  Ctrl+S / F1          Cycle sort mode (Newest, Oldest, Largest, Smallest, A-Z, Z-A)\n")
+		fmt.Printf("  Ctrl+T / F2          Cycle type filter (All, Skills, MCP)\n")
 		fmt.Printf("  /                    Focus agent search prompt\n")
 		fmt.Printf("  Enter                Review and confirm purge\n")
-		fmt.Printf("  Ctrl+Q / Ctrl+C      Exit without making changes\n")
+		fmt.Printf("  Ctrl+Q / Esc         Exit without making changes\n")
+		fmt.Printf("  Ctrl+C               Force quit immediately\n")
 	}
 
 	flag.Parse()

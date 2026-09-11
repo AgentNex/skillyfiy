@@ -3,8 +3,10 @@ package tui_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"skillyfiy/internal/config"
 	"skillyfiy/internal/model"
@@ -12,6 +14,7 @@ import (
 )
 
 func createTestItems() []model.AgentItem {
+	now := time.Now()
 	return []model.AgentItem{
 		{
 			ID:          "skill:web-search.md",
@@ -21,6 +24,7 @@ func createTestItems() []model.AgentItem {
 			Description: "Searches Google or DuckDuckGo",
 			Tokens:      100,
 			Size:        400,
+			ModTime:     now.Add(-2 * time.Hour),
 			Details: map[string]string{
 				"Category": "Agent Skill",
 				"Lines":    "20",
@@ -35,6 +39,7 @@ func createTestItems() []model.AgentItem {
 			Description: "AST based static code reviewer",
 			Tokens:      500,
 			Size:        2000,
+			ModTime:     now.Add(-1 * time.Hour),
 			Details: map[string]string{
 				"Category": "Agent Skill",
 				"Lines":    "80",
@@ -49,6 +54,7 @@ func createTestItems() []model.AgentItem {
 			Description: "npx -y @modelcontextprotocol/server-github",
 			Tokens:      250,
 			Size:        1000,
+			ModTime:     now,
 			Details: map[string]string{
 				"Category":  "MCP Server",
 				"Command":   "npx",
@@ -193,24 +199,29 @@ func TestTUICycleSortAndPaneSwitch(t *testing.T) {
 	items := createTestItems()
 
 	app := tui.NewAppModel(cfg, items)
-
-	// 1. Cycle Sort with Ctrl+S
-	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
-	m := updated.(tui.AppModel)
-	view := m.View()
-	if !strings.Contains(view, "[Sort: Tokens ↓]") {
-		t.Errorf("Expected [Sort: Tokens ↓], got: %s", view)
+	// Initial sort is Newest
+	view := app.View()
+	if !strings.Contains(view, "[Sort: Newest]") && !strings.Contains(view, "[Newest]") {
+		t.Errorf("Expected initial [Sort: Newest], got: %s", view)
 	}
 
-	// Cycle sort again to ItemType
+	// 1. Cycle Sort with Ctrl+S -> Oldest
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m := updated.(tui.AppModel)
+	view = m.View()
+	if !strings.Contains(view, "[Sort: Oldest]") && !strings.Contains(view, "[Oldest]") {
+		t.Errorf("Expected [Sort: Oldest], got: %s", view)
+	}
+
+	// 2. Cycle Sort again -> Largest
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
 	m = updated.(tui.AppModel)
 	view = m.View()
-	if !strings.Contains(view, "[Sort: Type]") {
-		t.Errorf("Expected [Sort: Type], got: %s", view)
+	if !strings.Contains(view, "[Sort: Largest]") && !strings.Contains(view, "[Largest]") {
+		t.Errorf("Expected [Sort: Largest], got: %s", view)
 	}
 
-	// 2. Switch Pane with Tab
+	// 3. Switch Pane with Tab
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = updated.(tui.AppModel)
 
@@ -221,6 +232,91 @@ func TestTUICycleSortAndPaneSwitch(t *testing.T) {
 	// Switch Pane back to List
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = updated.(tui.AppModel)
+}
+
+func TestTUICycleFilter(t *testing.T) {
+	cfg := &config.Config{DryRun: true}
+	items := createTestItems()
+
+	app := tui.NewAppModel(cfg, items)
+	view := app.View()
+	if !strings.Contains(view, "[Filter: All]") && !strings.Contains(view, "[All]") {
+		t.Errorf("Expected initial [Filter: All], got: %s", view)
+	}
+
+	// 1. Cycle Filter with Ctrl+T -> Skills
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyCtrlT})
+	m := updated.(tui.AppModel)
+	view = m.View()
+	if !strings.Contains(view, "[Filter: Skills]") && !strings.Contains(view, "[Skills]") {
+		t.Errorf("Expected [Filter: Skills], got: %s", view)
+	}
+	// MCP item github should NOT be visible
+	if strings.Contains(view, "github") {
+		t.Errorf("Expected github MCP to be filtered out in Skills filter")
+	}
+
+	// 2. Cycle Filter again -> MCP
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlT})
+	m = updated.(tui.AppModel)
+	view = m.View()
+	if !strings.Contains(view, "[Filter: MCP]") && !strings.Contains(view, "[MCP]") {
+		t.Errorf("Expected [Filter: MCP], got: %s", view)
+	}
+	// Skill items should NOT be visible
+	if strings.Contains(view, "web-search.md") {
+		t.Errorf("Expected web-search.md to be filtered out in MCP filter")
+	}
+}
+
+func TestTUIVisualModeWithSKey(t *testing.T) {
+	cfg := &config.Config{DryRun: true}
+	items := createTestItems()
+
+	app := tui.NewAppModel(cfg, items)
+
+	// Enter visual mode with 's'
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m := updated.(tui.AppModel)
+
+	view := m.View()
+	if !strings.Contains(view, "VISUAL RANGE") {
+		t.Errorf("Expected footer to indicate VISUAL RANGE after 's'")
+	}
+
+	// Move cursor down
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	m = updated.(tui.AppModel)
+
+	// Commit with 's'
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = updated.(tui.AppModel)
+
+	viewFinal := m.View()
+	if strings.Contains(viewFinal, "VISUAL RANGE") {
+		t.Errorf("Expected visual range exited after committing with 's'")
+	}
+}
+
+func TestTUIMobileLayout(t *testing.T) {
+	cfg := &config.Config{DryRun: true}
+	items := createTestItems()
+
+	app := tui.NewAppModel(cfg, items)
+
+	// Simulate narrow mobile screen (60x24)
+	updated, _ := app.Update(tea.WindowSizeMsg{Width: 60, Height: 24})
+	m := updated.(tui.AppModel)
+
+	view := m.View()
+	lines := strings.Split(view, "\n")
+	for i, l := range lines {
+		// Verify no line exceeds terminal visual width (eliminates auto-wrap)
+		w := lipgloss.Width(l)
+		if w > 60 {
+			t.Errorf("Line %d exceeds mobile width 60: visual width=%d", i, w)
+		}
+	}
 }
 
 func TestTUISearchFocus(t *testing.T) {
@@ -305,5 +401,108 @@ func TestTUIConfirmationModal(t *testing.T) {
 	modalLive := tui.RenderConfirmModal(items, 100, 30, false)
 	if !strings.Contains(modalLive, "IRREVERSIBLE PURGE") {
 		t.Errorf("Live modal missing irreversible warning")
+	}
+}
+
+func TestTUITieredSearch(t *testing.T) {
+	cfg := &config.Config{DryRun: true}
+	items := createTestItems()
+
+	app := tui.NewAppModel(cfg, items)
+
+	// 1. Focus search
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m := updated.(tui.AppModel)
+
+	// 2. Type "reviewer" (Tier 1 Name match)
+	for _, r := range "reviewer" {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = updated.(tui.AppModel)
+	}
+
+	view := m.View()
+	if !strings.Contains(view, "code-reviewer.py") {
+		t.Errorf("Expected code-reviewer.py in Tier 1 search match")
+	}
+	if strings.Contains(view, "web-search.md") {
+		t.Errorf("web-search.md should not match 'reviewer'")
+	}
+
+	// 3. Clear search input and search "google" (Tier 2 Description match)
+	for i := 0; i < 15; i++ {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+		m = updated.(tui.AppModel)
+	}
+	for _, r := range "google" {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = updated.(tui.AppModel)
+	}
+
+	viewDesc := m.View()
+	if !strings.Contains(viewDesc, "web-search.md") {
+		t.Errorf("Expected web-search.md to match 'google' in Tier 2 description")
+	}
+
+	// 4. Clear search and test Tier 3 Path match ("claude")
+	for i := 0; i < 15; i++ {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+		m = updated.(tui.AppModel)
+	}
+	for _, r := range "claude" {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = updated.(tui.AppModel)
+	}
+
+	viewPath := m.View()
+	if !strings.Contains(viewPath, "github") {
+		t.Errorf("Expected github MCP to match 'claude' in Tier 3 path")
+	}
+}
+
+func TestTUISortingCriteria(t *testing.T) {
+	cfg := &config.Config{DryRun: true}
+	items := createTestItems()
+
+	app := tui.NewAppModel(cfg, items)
+
+	// Initial is SortNewest
+	view := app.View()
+	if !strings.Contains(view, "Newest") {
+		t.Errorf("Expected initial sort to be Newest")
+	}
+
+	expectedSortBadges := []string{
+		"Oldest",
+		"Largest",
+		"Smallest",
+		"A-Z",
+		"Z-A",
+		"Newest",
+	}
+
+	m := app
+	for _, expected := range expectedSortBadges {
+		updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+		m = updated.(tui.AppModel)
+		v := m.View()
+		if !strings.Contains(v, expected) {
+			t.Errorf("Expected badge %s in view, got: %s", expected, v)
+		}
+	}
+}
+
+func TestTUIDefensiveClamping(t *testing.T) {
+	cfg := &config.Config{DryRun: true}
+	items := createTestItems()
+
+	app := tui.NewAppModel(cfg, items)
+
+	// Window too small
+	updated, _ := app.Update(tea.WindowSizeMsg{Width: 20, Height: 8})
+	m := updated.(tui.AppModel)
+
+	view := m.View()
+	if !strings.Contains(view, "Terminal too small") {
+		t.Errorf("Expected 'Terminal too small' message on tiny dimensions")
 	}
 }

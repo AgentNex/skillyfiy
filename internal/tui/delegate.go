@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/truncate"
 
 	"skillyfiy/internal/model"
@@ -121,6 +122,13 @@ func (d AgentItemDelegate) Render(w io.Writer, m list.Model, index int, listItem
 	if inVisualRange && !isCurrent {
 		line1 = VisualHighlightStyle.Render(line1)
 		line2 = VisualHighlightStyle.Render(line2)
+	}
+
+	if lipgloss.Width(line1) > width {
+		line1 = truncate.StringWithTail(line1, uint(width), "")
+	}
+	if lipgloss.Width(line2) > width {
+		line2 = truncate.StringWithTail(line2, uint(width), "")
 	}
 
 	fmt.Fprintf(w, "%s\n%s", line1, line2)

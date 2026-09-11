@@ -39,21 +39,36 @@ func RenderConfirmModal(items []model.AgentItem, width, height int, dryRun bool)
 
 	b.WriteString(NormalTitleStyle.Render("Review resources scheduled for removal:") + "\n\n")
 
-	b.WriteString(fmt.Sprintf("  • %-30s %s\n",
-		InspectorValStyle.Render("Skills to permanently unlink:"),
-		ColorMintGreenStyle(fmt.Sprintf("%d files", skillCount))))
+	modalW := width - 4
+	if modalW > 64 {
+		modalW = 64
+	}
+	if modalW < 36 {
+		modalW = 36
+	}
 
-	b.WriteString(fmt.Sprintf("  • %-30s %s\n",
-		InspectorValStyle.Render("MCP servers to deregister:"),
-		ColorMintBlueStyle(fmt.Sprintf("%d servers", mcpCount))))
+	if modalW < 55 {
+		b.WriteString(fmt.Sprintf(" • Skills: %s\n", ColorMintGreenStyle(fmt.Sprintf("%d files", skillCount))))
+		b.WriteString(fmt.Sprintf(" • MCPs:   %s\n", ColorMintBlueStyle(fmt.Sprintf("%d servers", mcpCount))))
+		b.WriteString(fmt.Sprintf(" • Tokens: %s\n", FooterReclaimedStyle.Render(fmt.Sprintf("~%d", totalTokens))))
+		b.WriteString(fmt.Sprintf(" • Space:  %s\n\n", InspectorValStyle.Render(model.FormatBytes(totalBytes))))
+	} else {
+		b.WriteString(fmt.Sprintf("  • %-30s %s\n",
+			InspectorValStyle.Render("Skills to permanently unlink:"),
+			ColorMintGreenStyle(fmt.Sprintf("%d files", skillCount))))
 
-	b.WriteString(fmt.Sprintf("  • %-30s %s\n",
-		InspectorValStyle.Render("Estimated context reclaimed:"),
-		FooterReclaimedStyle.Render(fmt.Sprintf("~%d tokens", totalTokens))))
+		b.WriteString(fmt.Sprintf("  • %-30s %s\n",
+			InspectorValStyle.Render("MCP servers to deregister:"),
+			ColorMintBlueStyle(fmt.Sprintf("%d servers", mcpCount))))
 
-	b.WriteString(fmt.Sprintf("  • %-30s %s\n\n",
-		InspectorValStyle.Render("Filesystem size freed:"),
-		InspectorValStyle.Render(model.FormatBytes(totalBytes))))
+		b.WriteString(fmt.Sprintf("  • %-30s %s\n",
+			InspectorValStyle.Render("Estimated context reclaimed:"),
+			FooterReclaimedStyle.Render(fmt.Sprintf("~%d tokens", totalTokens))))
+
+		b.WriteString(fmt.Sprintf("  • %-30s %s\n\n",
+			InspectorValStyle.Render("Filesystem size freed:"),
+			InspectorValStyle.Render(model.FormatBytes(totalBytes))))
+	}
 
 	if dryRun {
 		b.WriteString(InspectorKeyStyle.Render("Note: Dry-run active. No files or config keys will be removed.") + "\n\n")
@@ -70,7 +85,7 @@ func RenderConfirmModal(items []model.AgentItem, width, height int, dryRun bool)
 	)
 	b.WriteString(actions)
 
-	modalBox := ModalBoxStyle.Render(b.String())
+	modalBox := ModalBoxStyle.Copy().Width(modalW).Render(b.String())
 
 	// Center modal on screen
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, modalBox)

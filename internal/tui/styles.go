@@ -46,6 +46,12 @@ var (
 			Padding(0, 1).
 			Bold(true)
 
+	FilterBadgeStyle = lipgloss.NewStyle().
+			Foreground(ColorMintGreen).
+			Background(ColorMutedBg).
+			Padding(0, 1).
+			Bold(true)
+
 	// Split View Panes
 	LeftPaneStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
