@@ -16,12 +16,14 @@ import (
 // AgentItemDelegate implements list.ItemDelegate for rendering AgentItems.
 type AgentItemDelegate struct {
 	VisualAnchor *int
+	SearchQuery  *string
 }
 
-// NewAgentItemDelegate creates an item delegate with a reference to the visual anchor.
-func NewAgentItemDelegate(visualAnchor *int) AgentItemDelegate {
+// NewAgentItemDelegate creates an item delegate with references to visual anchor and search query.
+func NewAgentItemDelegate(visualAnchor *int, searchQuery *string) AgentItemDelegate {
 	return AgentItemDelegate{
 		VisualAnchor: visualAnchor,
+		SearchQuery:  searchQuery,
 	}
 }
 
@@ -40,7 +42,7 @@ func (d AgentItemDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 	return nil
 }
 
-// Render renders a single item with checkbox, badge, title, tokens, and description.
+// Render renders a single item with checkbox, badge, title, tokens, and description with search highlighting.
 func (d AgentItemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
 	item, ok := listItem.(model.AgentItem)
 	if !ok {
@@ -88,10 +90,8 @@ func (d AgentItemDelegate) Render(w io.Writer, m list.Model, index int, listItem
 	// 4. Token Weight
 	tokenStr := TokenWeightStyle.Render(fmt.Sprintf("~%dtk", item.Tokens))
 
-	// 5. Title
+	// 5. Title with Search Highlighting
 	titleText := item.Name
-	// Calculate available width for title
-	// cursor(2) + checkbox(3) + space(1) + badge(7) + space(1) + title + space(1) + tokenStr(len)
 	overhead := 2 + 3 + 1 + 7 + 1 + len(fmt.Sprintf("~%dtk", item.Tokens)) + 2
 	availTitleWidth := width - overhead
 	if availTitleWidth < 6 {
@@ -99,16 +99,22 @@ func (d AgentItemDelegate) Render(w io.Writer, m list.Model, index int, listItem
 	}
 	titleTrunc := truncate.StringWithTail(titleText, uint(availTitleWidth), "…")
 
-	titleStyled := NormalTitleStyle.Render(titleTrunc)
-	if item.Selected {
-		titleStyled = SelectedTitleStyle.Render(titleTrunc)
-	} else if isCurrent {
-		titleStyled = CursorTitleStyle.Render(titleTrunc)
+	var queryStr string
+	if d.SearchQuery != nil {
+		queryStr = *d.SearchQuery
 	}
 
+	baseTitleStyle := NormalTitleStyle
+	if item.Selected {
+		baseTitleStyle = SelectedTitleStyle
+	} else if isCurrent {
+		baseTitleStyle = CursorTitleStyle
+	}
+
+	titleStyled := HighlightMatches(titleTrunc, queryStr, baseTitleStyle, HighlightMatchStyle)
 	line1 := fmt.Sprintf("%s%s %s %s %s", cursorStr, checkboxStr, badgeStr, titleStyled, tokenStr)
 
-	// Line 2: Description
+	// Line 2: Description with Search Highlighting
 	descIndent := "      " // Align under item title
 	availDescWidth := width - len(descIndent) - 2
 	if availDescWidth < 10 {
@@ -117,7 +123,8 @@ func (d AgentItemDelegate) Render(w io.Writer, m list.Model, index int, listItem
 	cleanDesc := strings.ReplaceAll(item.Description, "\n", " ")
 	cleanDesc = strings.TrimSpace(cleanDesc)
 	descTrunc := truncate.StringWithTail(cleanDesc, uint(availDescWidth), "…")
-	line2 := descIndent + NormalDescStyle.Render(descTrunc)
+	descStyled := HighlightMatches(descTrunc, queryStr, NormalDescStyle, HighlightMatchStyle)
+	line2 := descIndent + descStyled
 
 	if inVisualRange && !isCurrent {
 		line1 = VisualHighlightStyle.Render(line1)
@@ -132,4 +139,97 @@ func (d AgentItemDelegate) Render(w io.Writer, m list.Model, index int, listItem
 	}
 
 	fmt.Fprintf(w, "%s\n%s", line1, line2)
+}
+
+// HighlightMatches highlights matched words or letters from query within target string.
+func HighlightMatches(target, query string, baseStyle, matchStyle lipgloss.Style) string {
+	cleanQuery := strings.ToLower(strings.TrimSpace(query))
+	if cleanQuery == "" || target == "" {
+		return baseStyle.Render(target)
+	}
+
+	targetRunes := []rune(target)
+	targetLower := []rune(strings.ToLower(target))
+	matched := make([]bool, len(targetRunes))
+
+	words := strings.Fields(cleanQuery)
+	for _, w := range words {
+		wRunes := []rune(w)
+		if len(wRunes) == 0 {
+			continue
+		}
+		wordMatched := false
+		for i := 0; i <= len(targetLower)-len(wRunes); i++ {
+			found := true
+			for k := 0; k < len(wRunes); k++ {
+				if targetLower[i+k] != wRunes[k] {
+					found = false
+					break
+				}
+			}
+			if found {
+				wordMatched = true
+				for k := 0; k < len(wRunes); k++ {
+					matched[i+k] = true
+				}
+			}
+		}
+
+		// If this word did not match contiguously, match its individual letters in sequence
+		if !wordMatched {
+			wIdx := 0
+			for i, tr := range targetLower {
+				if !matched[i] && wIdx < len(wRunes) && tr == wRunes[wIdx] {
+					matched[i] = true
+					wIdx++
+				}
+			}
+		}
+	}
+
+	// Full query subsequence fallback if nothing matched
+	anyMatched := false
+	for _, m := range matched {
+		if m {
+			anyMatched = true
+			break
+		}
+	}
+	if !anyMatched {
+		qRunes := []rune(cleanQuery)
+		qIdx := 0
+		for i, tr := range targetLower {
+			if qIdx < len(qRunes) && tr == qRunes[qIdx] {
+				matched[i] = true
+				qIdx++
+			}
+		}
+	}
+
+	// Group contiguous segments and render
+	var b strings.Builder
+	segStart := 0
+	isMatch := matched[0]
+
+	for i := 1; i < len(targetRunes); i++ {
+		if matched[i] != isMatch {
+			chunk := string(targetRunes[segStart:i])
+			if isMatch {
+				b.WriteString(matchStyle.Render(chunk))
+			} else {
+				b.WriteString(baseStyle.Render(chunk))
+			}
+			segStart = i
+			isMatch = matched[i]
+		}
+	}
+
+	chunk := string(targetRunes[segStart:])
+	if isMatch {
+		b.WriteString(matchStyle.Render(chunk))
+	} else {
+		b.WriteString(baseStyle.Render(chunk))
+	}
+
+	return b.String()
 }

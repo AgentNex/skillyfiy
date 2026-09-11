@@ -151,26 +151,45 @@ func TestTUIVisualMode(t *testing.T) {
 
 	app := tui.NewAppModel(cfg, items)
 
-	// 1. Enter visual mode by pressing 'v'
+	// 1. Enter multi-select mode by pressing 'v'
 	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
 	m := updated.(tui.AppModel)
 
 	view := m.View()
-	if !strings.Contains(view, "VISUAL RANGE") {
-		t.Errorf("Expected footer to indicate VISUAL RANGE")
+	if !strings.Contains(view, "MULTI-SELECT ACTIVE") {
+		t.Errorf("Expected footer to indicate MULTI-SELECT ACTIVE, got: %s", view)
 	}
 
-	// 2. Move cursor down with 'j'
+	// 2. Set span start with 's'
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = updated.(tui.AppModel)
+
+	viewSpan := m.View()
+	if !strings.Contains(viewSpan, "SPAN PINNED") {
+		t.Errorf("Expected footer to indicate SPAN PINNED, got: %s", viewSpan)
+	}
+
+	// 3. Move cursor down with 'j'
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	m = updated.(tui.AppModel)
 
-	// 3. Confirm range with 'v'
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+	// Range should display [~]
+	viewMoving := m.View()
+	if !strings.Contains(viewMoving, "[~]") {
+		t.Errorf("Expected [~] visual span highlight, got: %s", viewMoving)
+	}
+
+	// 4. Confirm range with 's'
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
 	m = updated.(tui.AppModel)
 
 	viewFinal := m.View()
-	if strings.Contains(viewFinal, "VISUAL RANGE") {
-		t.Errorf("Expected visual mode to be exited after second 'v'")
+	if strings.Contains(viewFinal, "SPAN PINNED") {
+		t.Errorf("Expected span pinned to be cleared after committing with 's'")
+	}
+	// Items in range should now be checked [✓]
+	if !strings.Contains(viewFinal, "[✓]") {
+		t.Errorf("Expected items in span to be checked [✓]")
 	}
 }
 
@@ -180,8 +199,8 @@ func TestTUIVisualModeCancel(t *testing.T) {
 
 	app := tui.NewAppModel(cfg, items)
 
-	// Enter visual mode
-	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+	// Enter visual span
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
 	m := updated.(tui.AppModel)
 
 	// Cancel with Esc
@@ -189,8 +208,8 @@ func TestTUIVisualModeCancel(t *testing.T) {
 	m2 := updated.(tui.AppModel)
 
 	view := m2.View()
-	if strings.Contains(view, "VISUAL RANGE") {
-		t.Errorf("Expected visual mode cancelled on Esc")
+	if strings.Contains(view, "SPAN PINNED") {
+		t.Errorf("Expected visual span cancelled on Esc")
 	}
 }
 
@@ -275,13 +294,13 @@ func TestTUIVisualModeWithSKey(t *testing.T) {
 
 	app := tui.NewAppModel(cfg, items)
 
-	// Enter visual mode with 's'
+	// Pin span anchor with 's'
 	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
 	m := updated.(tui.AppModel)
 
 	view := m.View()
-	if !strings.Contains(view, "VISUAL RANGE") {
-		t.Errorf("Expected footer to indicate VISUAL RANGE after 's'")
+	if !strings.Contains(view, "SPAN PINNED") {
+		t.Errorf("Expected footer to indicate SPAN PINNED after 's', got: %s", view)
 	}
 
 	// Move cursor down
@@ -293,8 +312,11 @@ func TestTUIVisualModeWithSKey(t *testing.T) {
 	m = updated.(tui.AppModel)
 
 	viewFinal := m.View()
-	if strings.Contains(viewFinal, "VISUAL RANGE") {
-		t.Errorf("Expected visual range exited after committing with 's'")
+	if strings.Contains(viewFinal, "SPAN PINNED") {
+		t.Errorf("Expected visual span exited after committing with 's'")
+	}
+	if !strings.Contains(viewFinal, "[✓]") {
+		t.Errorf("Expected selected checkmarks after committing span")
 	}
 }
 
@@ -504,5 +526,111 @@ func TestTUIDefensiveClamping(t *testing.T) {
 	view := m.View()
 	if !strings.Contains(view, "Terminal too small") {
 		t.Errorf("Expected 'Terminal too small' message on tiny dimensions")
+	}
+}
+
+func TestTUISearchSlashToggleExit(t *testing.T) {
+	cfg := &config.Config{DryRun: true}
+	items := createTestItems()
+
+	app := tui.NewAppModel(cfg, items)
+
+	// 1. Focus search with '/'
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m := updated.(tui.AppModel)
+
+	// 2. Pressing '/' while search is focused must cleanly exit search mode
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m = updated.(tui.AppModel)
+
+	// Press space to verify list navigation works (and '/' was not appended to search input)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	m = updated.(tui.AppModel)
+	view := m.View()
+	if !strings.Contains(view, "[✓]") {
+		t.Errorf("Expected space to toggle item selection after exiting search with '/'")
+	}
+}
+
+func TestTUIHelpOverlay(t *testing.T) {
+	cfg := &config.Config{DryRun: true}
+	items := createTestItems()
+
+	app := tui.NewAppModel(cfg, items)
+
+	// 1. Open Help overlay with 'i'
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	m := updated.(tui.AppModel)
+
+	view := m.View()
+	if !strings.Contains(view, "SKILLYFIY KEYBINDINGS") {
+		t.Errorf("Expected help modal to be rendered on 'i'")
+	}
+
+	// 2. Close Help overlay with 'i'
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	m = updated.(tui.AppModel)
+
+	viewClosed := m.View()
+	if strings.Contains(viewClosed, "SKILLYFIY KEYBINDINGS") {
+		t.Errorf("Expected help modal to close on second 'i'")
+	}
+
+	// 3. Open Help with '?' and close with 'esc'
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	m = updated.(tui.AppModel)
+	if !strings.Contains(m.View(), "SKILLYFIY KEYBINDINGS") {
+		t.Errorf("Expected help modal to open on '?'")
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(tui.AppModel)
+	if strings.Contains(m.View(), "SKILLYFIY KEYBINDINGS") {
+		t.Errorf("Expected help modal to close on Esc")
+	}
+}
+
+func TestHighlightMatches(t *testing.T) {
+	baseStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF"))
+	matchStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981")).Bold(true)
+
+	// 1. Exact word match
+	res1 := tui.HighlightMatches("web-search-crawler", "search", baseStyle, matchStyle)
+	if !strings.Contains(res1, "search") {
+		t.Errorf("HighlightMatches failed to contain search: %s", res1)
+	}
+
+	// 2. Multi-word match
+	res2 := tui.HighlightMatches("web-search-crawler", "web crawler", baseStyle, matchStyle)
+	if !strings.Contains(res2, "web") || !strings.Contains(res2, "crawler") {
+		t.Errorf("HighlightMatches failed multi-word: %s", res2)
+	}
+
+	// 3. Subsequence fallback
+	res3 := tui.HighlightMatches("go-playwright", "goplay", baseStyle, matchStyle)
+	if res3 == "" {
+		t.Errorf("HighlightMatches returned empty string on subsequence")
+	}
+}
+
+func TestTUIFuzzySubsequenceSearch(t *testing.T) {
+	cfg := &config.Config{DryRun: true}
+	items := createTestItems()
+
+	app := tui.NewAppModel(cfg, items)
+
+	// Focus search
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m := updated.(tui.AppModel)
+
+	// Type letters: "cr" should match "code-reviewer.py"
+	for _, r := range "cr" {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = updated.(tui.AppModel)
+	}
+
+	view := m.View()
+	if !strings.Contains(view, "code-reviewer.py") {
+		t.Errorf("Expected code-reviewer.py to match subsequence 'cr'")
 	}
 }

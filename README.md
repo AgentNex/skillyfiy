@@ -16,7 +16,7 @@
 Accumulating hundreds of agent skills and MCP servers pollutes context windows, degrades reasoning performance, and inflates system prompt token costs. **Skillyfiy** provides an interactive, split-pane Terminal User Interface (TUI) designed to browse, inspect, and bulk-prune agent overhead with sub-millisecond responsiveness.
 
 ```
-┌── SKILLYFIY v0.2.0 ────────────────────────────┬───────────────────────────────┐
+┌── SKILLYFIY v0.2.1 ────────────────────────────┬───────────────────────────────┐
 │ / Search: [ scraper           ] [Sort] [Filter]│ INSPECTOR                     │
 ├────────────────────────────────────────────────┼───────────────────────────────┤
 │ ▶ [✓] [SKILL] web_scraper.py           1.2 KB  │ Target: web_scraper.py        │
@@ -24,7 +24,7 @@ Accumulating hundreds of agent skills and MCP servers pollutes context windows, 
 │   [✓] [SKILL] doc_indexer.md           0.8 KB  │ System Tokens: ~840 tokens    │
 ├────────────────────────────────────────────────┴───────────────────────────────┤
 │ [2/1,542 Selected]  •  ~2,040 Tokens Reclaimed                                 │
-│ [Space] Toggle • [s/v] Span • [Ctrl+S] Sort • [Ctrl+T] Filter • [Enter] Purge  │
+│ [i] Help Modal • [/] Search • [v] Multi-Select • [Enter] Purge                 │
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -67,12 +67,18 @@ Install the Skillyfiy CLI tool on my system:
 
 | Key | Action |
 |---|---|
-| `Space` / `x` | Toggle single item |
-| `s` | Toggle Skillyfiy Span (Visual Range mode) |
-| `Ctrl+A` | Toggle select all visible items |
-| `Tab` | Switch between Search and List pane |
-| `Enter` | Review and confirm purge |
-| `Ctrl+Q` / `Ctrl+C` | Exit without making changes |
+| `↑` / `↓` / `k` / `j` | Move cursor through items / scroll inspector |
+| `Space` / `x` | Toggle single item selection |
+| `v` | Turn Multi-Select mode ON / OFF |
+| `s` | Pin span anchor on start item; scroll; press `s` again on end item to select range |
+| `Ctrl+A` | Toggle select/deselect all visible items |
+| `/` | Focus search bar (**press `/` again to exit/blur search**) |
+| `Ctrl+S` / `F1` | Cycle 6 sort modes (Newest, Oldest, Largest, Smallest, A-Z, Z-A) |
+| `Ctrl+T` / `F2` | Cycle 3 resource filters (All, Skills, MCP Servers) |
+| `Tab` | Switch focus between List pane and Inspector pane |
+| `Enter` | Review and confirm purge of selected items |
+| `i` / `?` | **Toggle Help Modal overlay** showing all controls |
+| `Ctrl+Q` / `Esc` | Exit Skillyfiy |
 
 ## ⚙️ CLI Flags
 

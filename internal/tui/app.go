@@ -33,15 +33,18 @@ const (
 
 // AppModel is the top-level Bubble Tea model orchestrating the Skillyfiy TUI.
 type AppModel struct {
-	cfg          *config.Config
-	keys         config.KeyMap
-	state        appState
-	focusedPane  paneFocus
-	width        int
-	height       int
-	sortMode     model.SortMode
-	filterType   model.FilterType
-	visualAnchor int
+	cfg             *config.Config
+	keys            config.KeyMap
+	state           appState
+	focusedPane     paneFocus
+	width           int
+	height          int
+	sortMode        model.SortMode
+	filterType      model.FilterType
+	visualAnchor    int
+	multiSelectMode bool
+	showHelpOverlay bool
+	searchQuery     string
 
 	allItems    []model.AgentItem
 	selectedMap map[string]bool
@@ -70,7 +73,8 @@ func NewAppModel(cfg *config.Config, items []model.AgentItem) AppModel {
 	ti.CharLimit = 120
 
 	visualAnchor := -1
-	delegate := NewAgentItemDelegate(&visualAnchor)
+	searchQuery := ""
+	delegate := NewAgentItemDelegate(&visualAnchor, &searchQuery)
 
 	l := list.New([]list.Item{}, delegate, 40, 20)
 	l.SetShowTitle(false)
@@ -91,21 +95,24 @@ func NewAppModel(cfg *config.Config, items []model.AgentItem) AppModel {
 	}
 
 	app := AppModel{
-		cfg:          cfg,
-		keys:         config.DefaultKeyMap,
-		state:        stateMain,
-		focusedPane:  paneList,
-		width:        80,
-		height:       24,
-		sortMode:     model.SortNewest,
-		filterType:   model.FilterAll,
-		visualAnchor: visualAnchor,
-		allItems:     items,
-		selectedMap:  selectedMap,
-		searchInput:  ti,
-		list:         l,
-		inspector:    inspector,
-		delegate:     delegate,
+		cfg:             cfg,
+		keys:            config.DefaultKeyMap,
+		state:           stateMain,
+		focusedPane:     paneList,
+		width:           80,
+		height:          24,
+		sortMode:        model.SortNewest,
+		filterType:      model.FilterAll,
+		visualAnchor:    visualAnchor,
+		multiSelectMode: false,
+		showHelpOverlay: false,
+		searchQuery:     searchQuery,
+		allItems:        items,
+		selectedMap:     selectedMap,
+		searchInput:     ti,
+		list:            l,
+		inspector:       inspector,
+		delegate:        delegate,
 	}
 
 	app.recalculateSizes()
@@ -155,35 +162,53 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		// State: Help Modal Overlay
+		if m.showHelpOverlay {
+			switch msg.String() {
+			case "i", "I", "esc", "q", "enter", "?":
+				m.showHelpOverlay = false
+				return m, nil
+			default:
+				return m, nil
+			}
+		}
+
 		// State: Main Dashboard
 		// If Search Input is focused:
 		if m.searchInput.Focused() {
-			switch msg.Type {
-			case tea.KeyEsc, tea.KeyEnter:
+			if msg.String() == "/" || msg.Type == tea.KeyEsc || msg.Type == tea.KeyEnter {
 				m.searchInput.Blur()
+				m.syncDelegateQuery()
 				return m, nil
-			default:
-				var cmd tea.Cmd
-				prevVal := m.searchInput.Value()
-				m.searchInput, cmd = m.searchInput.Update(msg)
-				if m.searchInput.Value() != prevVal {
-					m.updateListItems()
-				}
-				return m, cmd
 			}
+			var cmd tea.Cmd
+			prevVal := m.searchInput.Value()
+			m.searchInput, cmd = m.searchInput.Update(msg)
+			if m.searchInput.Value() != prevVal {
+				m.updateListItems()
+			}
+			return m, cmd
 		}
 
 		// Search Input is not focused:
 		switch {
+		case msg.String() == "i" || msg.String() == "I" || key.Matches(msg, m.keys.Help):
+			m.showHelpOverlay = true
+			return m, nil
+
 		case key.Matches(msg, m.keys.Quit):
 			if m.visualAnchor != -1 {
 				m.visualAnchor = -1
 				m.syncDelegateAnchor()
 				return m, nil
 			}
+			if m.multiSelectMode {
+				m.multiSelectMode = false
+				return m, nil
+			}
 			return m, tea.Quit
 
-		case key.Matches(msg, m.keys.FocusSearch):
+		case key.Matches(msg, m.keys.FocusSearch) || msg.String() == "/":
 			m.searchInput.Focus()
 			return m, textinput.Blink
 
@@ -231,16 +256,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toggleSelectAll()
 			return m, nil
 
-		case key.Matches(msg, m.keys.VisualRange):
-			m.toggleVisualMode()
+		case key.Matches(msg, m.keys.VisualRange) || msg.String() == "v" || msg.String() == "V":
+			m.toggleMultiSelectMode()
 			return m, nil
 
-		case msg.String() == "s":
-			if m.visualAnchor != -1 {
-				m.commitVisualRange()
-				return m, nil
-			}
-			m.toggleVisualMode()
+		case key.Matches(msg, m.keys.VisualSpan) || msg.String() == "s" || msg.String() == "S":
+			m.handleSpanKey()
 			return m, nil
 
 		default:
@@ -266,6 +287,10 @@ func (m AppModel) View() string {
 
 	if m.state == stateConfirm {
 		return RenderConfirmModal(m.allItems, m.width, m.height, m.cfg.DryRun)
+	}
+
+	if m.showHelpOverlay {
+		return RenderHelpModal(m.width, m.height)
 	}
 
 	var b strings.Builder
@@ -412,7 +437,12 @@ func (m *AppModel) calculateContentHeights() (listInner, inspInner int, isStacke
 
 func (m *AppModel) renderFooter() string {
 	if m.visualAnchor != -1 {
-		msg := fmt.Sprintf(" -- VISUAL RANGE (Pinned #%d) -- Tap 'v' or 's' to lock, Esc to cancel. ", m.visualAnchor+1)
+		msg := fmt.Sprintf(" -- SPAN PINNED (#%d) -- Scroll to target item & tap 's' to lock (Esc cancels) ", m.visualAnchor+1)
+		return truncate.StringWithTail(FooterVisualModeStyle.Render(msg), uint(m.width-1), "")
+	}
+
+	if m.multiSelectMode {
+		msg := " -- MULTI-SELECT ACTIVE -- Move to item & tap 's' to pin span start (Esc exits) "
 		return truncate.StringWithTail(FooterVisualModeStyle.Render(msg), uint(m.width-1), "")
 	}
 
@@ -420,17 +450,12 @@ func (m *AppModel) renderFooter() string {
 	reclaimedTokens := m.getReclaimedTokens()
 
 	var leftHints string
-	switch {
-	case m.width >= 115:
-		leftHints = "[↑/↓] Move • [Space] Mark • [v/s] Span • [Ctrl+A] All • [/] Search • [Tab] Pane • [Ctrl+S] Sort • [Ctrl+T] Filter • [Enter] Purge • [Ctrl+Q] Quit"
-	case m.width >= 90:
-		leftHints = "[↑/↓] Move • [Space] Mark • [v/s] Span • [Tab] Pane • [Ctrl+S] Sort • [Ctrl+T] Filter • [Enter] Purge • [Ctrl+Q] Quit"
-	case m.width >= 65:
-		leftHints = "[↑/↓] Move • [Space] Mark • [Tab] Pane • [Ctrl+S] Sort • [Ctrl+T] Filter • [Enter] Purge"
-	case m.width >= 45:
-		leftHints = "[Space] Mark • [Tab] Pane • [Ctrl+S] Sort • [Enter] Purge"
-	default:
-		leftHints = "[Space] Mark • [Enter] Purge"
+	if m.width >= 75 {
+		leftHints = "[i] Help Modal • [/] Search • [v] Multi-Select • [Enter] Purge"
+	} else if m.width >= 52 {
+		leftHints = "[i] Help • [/] Search • [v] Multi • [Enter] Purge"
+	} else {
+		leftHints = "[i] Help • [Enter] Purge"
 	}
 	leftFormatted := FooterStyle.Render(leftHints)
 
@@ -502,8 +527,12 @@ func (m *AppModel) updateListItems() {
 		m.allItems[i].Selected = m.selectedMap[m.allItems[i].ID]
 	}
 
+	m.searchQuery = m.searchInput.Value()
+	m.delegate.SearchQuery = &m.searchQuery
+	m.list.SetDelegate(m.delegate)
+
 	// Filter and sort items according to query, sortMode, and filterType
-	filtered := filterAndSortItems(m.allItems, m.searchInput.Value(), m.sortMode, m.filterType)
+	filtered := filterAndSortItems(m.allItems, m.searchQuery, m.sortMode, m.filterType)
 
 	listItems := make([]list.Item, len(filtered))
 	for i, it := range filtered {
@@ -603,26 +632,23 @@ func (m *AppModel) toggleSelectAll() {
 	}
 }
 
-func (m *AppModel) toggleVisualMode() {
+func (m *AppModel) toggleMultiSelectMode() {
+	if !m.multiSelectMode {
+		m.multiSelectMode = true
+		m.visualAnchor = -1
+	} else {
+		m.multiSelectMode = false
+		m.visualAnchor = -1
+		m.syncDelegateAnchor()
+	}
+}
+
+func (m *AppModel) handleSpanKey() {
 	if m.visualAnchor == -1 {
 		idx := m.list.Index()
 		m.visualAnchor = idx
+		m.multiSelectMode = true
 		m.syncDelegateAnchor()
-
-		// Select the anchor item
-		items := m.list.Items()
-		if idx >= 0 && idx < len(items) {
-			item := items[idx].(model.AgentItem)
-			m.selectedMap[item.ID] = true
-			item.Selected = true
-			m.list.SetItem(idx, item)
-			for j := range m.allItems {
-				if m.allItems[j].ID == item.ID {
-					m.allItems[j].Selected = true
-					break
-				}
-			}
-		}
 	} else {
 		m.commitVisualRange()
 	}
@@ -660,6 +686,12 @@ func (m *AppModel) commitVisualRange() {
 
 func (m *AppModel) syncDelegateAnchor() {
 	m.delegate.VisualAnchor = &m.visualAnchor
+	m.list.SetDelegate(m.delegate)
+}
+
+func (m *AppModel) syncDelegateQuery() {
+	m.searchQuery = m.searchInput.Value()
+	m.delegate.SearchQuery = &m.searchQuery
 	m.list.SetDelegate(m.delegate)
 }
 
@@ -726,6 +758,24 @@ func sortItems(items []model.AgentItem, mode model.SortMode) {
 	}
 }
 
+func isSubsequence(target, query string) bool {
+	if query == "" {
+		return true
+	}
+	tRunes := []rune(strings.ToLower(target))
+	qRunes := []rune(strings.ToLower(query))
+	qIdx := 0
+	for _, tr := range tRunes {
+		if tr == qRunes[qIdx] {
+			qIdx++
+			if qIdx == len(qRunes) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func filterAndSortItems(items []model.AgentItem, query string, sortMode model.SortMode, filterType model.FilterType) []model.AgentItem {
 	// 1. Type Filter
 	var typeFiltered []model.AgentItem
@@ -751,57 +801,99 @@ func filterAndSortItems(items []model.AgentItem, query string, sortMode model.So
 	}
 
 	tokens := strings.Fields(cleanQuery)
-	var tier1, tier2, tier3 []model.AgentItem
+	seen := make(map[string]bool)
+
+	var tier1, tier2, tier3, tier4, tier5, tier6 []model.AgentItem
 
 	for _, it := range typeFiltered {
 		it.EnsureCache()
 
-		// Tier 1: Match in Name
-		matchName := true
+		// Tier 1: All query words match in Name
+		allTokensName := true
 		for _, tok := range tokens {
 			if !strings.Contains(it.NameLower, tok) {
-				matchName = false
+				allTokensName = false
 				break
 			}
 		}
-		if matchName {
+		if allTokensName {
 			tier1 = append(tier1, it)
+			seen[it.ID] = true
 			continue
 		}
 
-		// Tier 2: Match in Description
-		matchDesc := true
+		// Tier 2: All query words match in Description
+		allTokensDesc := true
 		for _, tok := range tokens {
 			if !strings.Contains(it.DescLower, tok) && !strings.Contains(it.NameLower, tok) {
-				matchDesc = false
+				allTokensDesc = false
 				break
 			}
 		}
-		if matchDesc {
+		if allTokensDesc {
 			tier2 = append(tier2, it)
+			seen[it.ID] = true
 			continue
 		}
 
-		// Tier 3: Match in Path
-		matchPath := true
+		// Tier 3: Subsequence match in Name (letters typed match in order, e.g. "anm" -> "animejs-animation")
+		if isSubsequence(it.NameLower, cleanQuery) {
+			tier3 = append(tier3, it)
+			seen[it.ID] = true
+			continue
+		}
+
+		// Tier 4: Any query token matches in Name or Description
+		anyTokenMatch := false
 		for _, tok := range tokens {
-			if !strings.Contains(it.PathLower, tok) && !strings.Contains(it.DescLower, tok) && !strings.Contains(it.NameLower, tok) {
-				matchPath = false
+			if strings.Contains(it.NameLower, tok) || strings.Contains(it.DescLower, tok) {
+				anyTokenMatch = true
 				break
 			}
 		}
+		if anyTokenMatch {
+			tier4 = append(tier4, it)
+			seen[it.ID] = true
+			continue
+		}
+
+		// Tier 5: Subsequence match in Description
+		if isSubsequence(it.DescLower, cleanQuery) {
+			tier5 = append(tier5, it)
+			seen[it.ID] = true
+			continue
+		}
+
+		// Tier 6: Match in Path (token substring or subsequence)
+		matchPath := false
+		for _, tok := range tokens {
+			if strings.Contains(it.PathLower, tok) {
+				matchPath = true
+				break
+			}
+		}
+		if !matchPath && isSubsequence(it.PathLower, cleanQuery) {
+			matchPath = true
+		}
 		if matchPath {
-			tier3 = append(tier3, it)
+			tier6 = append(tier6, it)
+			seen[it.ID] = true
 		}
 	}
 
 	sortItems(tier1, sortMode)
 	sortItems(tier2, sortMode)
 	sortItems(tier3, sortMode)
+	sortItems(tier4, sortMode)
+	sortItems(tier5, sortMode)
+	sortItems(tier6, sortMode)
 
-	result := make([]model.AgentItem, 0, len(tier1)+len(tier2)+len(tier3))
+	result := make([]model.AgentItem, 0, len(seen))
 	result = append(result, tier1...)
 	result = append(result, tier2...)
 	result = append(result, tier3...)
+	result = append(result, tier4...)
+	result = append(result, tier5...)
+	result = append(result, tier6...)
 	return result
 }

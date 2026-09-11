@@ -15,8 +15,8 @@ import (
 	"skillyfiy/internal/tui"
 )
 
-// Version is injected at build time via -ldflags="-X main.Version=v0.2.0"
-var Version = "v0.2.0"
+// Version is injected at build time via -ldflags="-X main.Version=v0.2.1"
+var Version = "v0.2.1"
 
 func main() {
 	cfg, isVersion := config.ParseFlags()

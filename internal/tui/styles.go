@@ -171,4 +171,30 @@ var (
 	ModalActionStyle = lipgloss.NewStyle().
 				Foreground(ColorMintGreen).
 				Bold(true)
+
+	// Search Highlighting
+	HighlightMatchStyle = lipgloss.NewStyle().
+				Foreground(ColorMintGreen).
+				Bold(true).
+				Underline(true)
+
+	// Help Overlay Modal
+	HelpModalStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ColorMintBlue).
+			Background(ColorBase).
+			Padding(1, 2)
+
+	HelpSectionStyle = lipgloss.NewStyle().
+				Foreground(ColorMintBlue).
+				Bold(true).
+				MarginTop(1)
+
+	HelpKeyStyle = lipgloss.NewStyle().
+			Foreground(ColorMintGreen).
+			Bold(true).
+			Width(16)
+
+	HelpDescStyle = lipgloss.NewStyle().
+			Foreground(ColorBrightSlate)
 )

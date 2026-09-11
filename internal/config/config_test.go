@@ -36,6 +36,12 @@ func TestKeyMapBindings(t *testing.T) {
 	if len(km.VisualRange.Keys()) == 0 {
 		t.Errorf("VisualRange keys empty")
 	}
+	if len(km.VisualSpan.Keys()) == 0 {
+		t.Errorf("VisualSpan keys empty")
+	}
+	if len(km.Help.Keys()) == 0 {
+		t.Errorf("Help keys empty")
+	}
 	if len(km.SelectAll.Keys()) == 0 {
 		t.Errorf("SelectAll keys empty")
 	}
