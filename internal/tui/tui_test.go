@@ -634,3 +634,23 @@ func TestTUIFuzzySubsequenceSearch(t *testing.T) {
 		t.Errorf("Expected code-reviewer.py to match subsequence 'cr'")
 	}
 }
+
+func TestResponsiveBannerSizes(t *testing.T) {
+	widths := []int{120, 90, 80, 65, 55, 45, 38, 36, 32, 28}
+	for _, w := range widths {
+		banner := tui.RenderBanner(w)
+		expectedH := tui.BannerHeight(w)
+		lines := strings.Split(banner, "\n")
+
+		if len(lines) != expectedH {
+			t.Errorf("At width %d: BannerHeight=%d but RenderBanner produced %d lines", w, expectedH, len(lines))
+		}
+
+		for i, l := range lines {
+			visualW := lipgloss.Width(l)
+			if visualW >= w {
+				t.Errorf("At width %d, line %d visual width %d >= terminal width %d", w, i, visualW, w)
+			}
+		}
+	}
+}

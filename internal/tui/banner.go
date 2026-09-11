@@ -3,53 +3,107 @@ package tui
 import (
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/truncate"
 )
 
-// ASCIIBanner contains the stylized compact block letters for "SKILLYFIY".
-const ASCIIBanner = `  ___ _  _____ _    _   __  _____ ___ __   __
- / __| |/ /_ _| |  | |  \ \/ / __|_ _|\ \ / /
- \__ \ ' < | || |__| |__ \  /| _| | |  \ V / 
- |___/_|\_\___|____|____|/_/ |_| |___|  |_|  `
+// BannerGradient defines the smooth 9-color gradient: Mint Green -> Cyan -> Silver Grey.
+var BannerGradient = []lipgloss.TerminalColor{
+	lipgloss.Color("#10B981"), // S: Vibrant Mint Green
+	lipgloss.Color("#14B8A6"), // K: Mint Teal
+	lipgloss.Color("#06B6D4"), // I: Teal Cyan
+	lipgloss.Color("#0EA5E9"), // L: Vivid Cyan
+	lipgloss.Color("#38BDF8"), // L: Sky Cyan
+	lipgloss.Color("#7DD3FC"), // Y: Light Sky Cyan
+	lipgloss.Color("#94A3B8"), // F: Cool Slate Silver
+	lipgloss.Color("#CBD5E1"), // I: Silver Grey
+	lipgloss.Color("#F1F5F9"), // Y: Bright Crisp Silver
+}
+
+// Block letter rows for "SKILLYFIY" (3 cells per letter, 35 columns total).
+var (
+	bannerLettersRow0 = []string{"█▀▀", "█▀▄", "▀█▀", "█  ", "█  ", "█ █", "█▀▀", "▀█▀", "█ █"}
+	bannerLettersRow1 = []string{"▄▄█", "█ █", "▄█▄", "█▄▄", "█▄▄", " █ ", "█  ", "▄█▄", " █ "}
+)
 
 // SubtitleText provides context for the tool.
 const SubtitleText = "Terminal AI Agent Skill & MCP Context Overhead Optimizer [sky]"
 
-// RenderBanner renders the stylized header, adapting dynamically to terminal width.
+// RenderBanner renders the bold, blocky, yet simple and slim header for "SKILLYFIY"
+// with a mint green -> cyan -> silver grey gradient that dynamically adapts to screen size.
 func RenderBanner(width int) string {
-	if width >= 70 {
-		banner := BannerStyle.Render(ASCIIBanner)
-		sub := SubtitleText
-		avail := width - 2
-		if avail > 0 && len(sub) > avail {
-			sub = truncate.StringWithTail(sub, uint(avail), "…")
-		}
-		subtitle := SubtitleStyle.Render(sub)
-		return banner + "\n" + subtitle
+	w := width
+	if w <= 0 {
+		w = 80
 	}
 
-	return CompactBanner(width)
+	if w < 37 {
+		return CompactBanner(w)
+	}
+
+	// Normal and wide screens (>= 37 columns): render 2-line block letters
+	var r0, r1 strings.Builder
+	r0.WriteString(" ")
+	r1.WriteString(" ")
+	for i := 0; i < 9; i++ {
+		style := lipgloss.NewStyle().Foreground(BannerGradient[i]).Bold(true)
+		r0.WriteString(style.Render(bannerLettersRow0[i]))
+		r1.WriteString(style.Render(bannerLettersRow1[i]))
+		if i < 8 {
+			r0.WriteString(" ")
+			r1.WriteString(" ")
+		}
+	}
+
+	line0 := r0.String()
+	line1 := r1.String()
+
+	if lipgloss.Width(line0) >= w {
+		line0 = truncate.StringWithTail(line0, uint(w-1), "")
+	}
+	if lipgloss.Width(line1) >= w {
+		line1 = truncate.StringWithTail(line1, uint(w-1), "")
+	}
+
+	if w >= 45 {
+		sub := " — SKILLYFIY Context Optimizer [sky]"
+		if w < 60 {
+			sub = " — SKILLYFIY Optimizer"
+		}
+		avail := w - 2
+		if avail > 0 && len(sub) > avail {
+			sub = truncate.StringWithTail(sub, uint(avail), "")
+		}
+		line2 := SubtitleStyle.Render(sub)
+		return line0 + "\n" + line1 + "\n" + line2
+	}
+
+	return line0 + "\n" + line1
 }
 
-// CompactBanner returns a single-line compact representation for narrow terminals.
+// CompactBanner returns a single-line compact representation for narrow or zoomed-in terminals.
 func CompactBanner(width ...int) string {
 	w := 80
 	if len(width) > 0 && width[0] > 0 {
 		w = width[0]
 	}
 
-	title := "⚡ SKILLYFIY"
-	desc := "Context Overhead Optimizer"
-	if w < 50 {
-		desc = "Optimizer"
+	var b strings.Builder
+	b.WriteString(" ⚡ ")
+	rawChars := []rune("SKILLYFIY")
+	for i, ch := range rawChars {
+		style := lipgloss.NewStyle().Foreground(BannerGradient[i]).Bold(true)
+		b.WriteString(style.Render(string(ch)))
 	}
-	if w < 28 {
-		return BannerStyle.Render(title)
+	b.WriteString(" ")
+
+	if w >= 40 {
+		b.WriteString(SubtitleStyle.Render("— SKILLYFIY Optimizer"))
 	}
 
-	line := BannerStyle.Render(title) + " " + SubtitleStyle.Render("— "+desc)
-	if w > 2 && len(title)+len(desc)+5 > w {
-		line = truncate.StringWithTail(line, uint(w-2), "…")
+	line := b.String()
+	if lipgloss.Width(line) >= w {
+		line = truncate.StringWithTail(line, uint(w-1), "")
 	}
 	return line
 }
@@ -60,8 +114,11 @@ func BannerHeight(width ...int) int {
 	if len(width) > 0 && width[0] > 0 {
 		w = width[0]
 	}
-	if w >= 70 {
-		return strings.Count(ASCIIBanner, "\n") + 2
+	if w >= 45 {
+		return 3
+	}
+	if w >= 37 {
+		return 2
 	}
 	return 1
 }
