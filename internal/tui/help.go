@@ -7,12 +7,19 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// RenderHelpModal builds a centered, responsive modal listing all keybindings and commands.
+// RenderHelpModal builds the help overlay with the gradient at its resting phase.
 func RenderHelpModal(width, height int) string {
+	return RenderHelpModalAnimated(width, height, 0, nil)
+}
+
+// RenderHelpModalAnimated builds a centered, responsive modal listing all
+// keybindings and commands. The animation is paused while this overlay is open,
+// so the title renders the gradient frozen at the current phase.
+func RenderHelpModalAnimated(width, height int, phase float64, lut []lipgloss.Color) string {
 	var b strings.Builder
 
 	title := "⚡ SKILLYFIY KEYBINDINGS & CONTROLS [sky]"
-	b.WriteString(BannerStyle.Render(title) + "\n")
+	b.WriteString(renderSweepLine(title, phase, lut) + "\n")
 
 	modalW := width - 4
 	if modalW > 68 {
@@ -53,6 +60,7 @@ func RenderHelpModal(width, height int) string {
 	b.WriteString(row("/", "Focus search bar (press '/' again to exit)"))
 	b.WriteString(row("Ctrl+S / F1", "Cycle 6 sort modes (Newest, Size, A-Z...)"))
 	b.WriteString(row("Ctrl+T / F2", "Cycle 3 resource filters (All, Skills, MCP)"))
+	b.WriteString(row("Ctrl+K", "Command mode — type /anim to cycle the gradient"))
 
 	if !isCompact {
 		b.WriteString(HelpSectionStyle.Render("▶ ACTIONS") + "\n")

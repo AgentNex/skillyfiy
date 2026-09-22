@@ -8,6 +8,9 @@ import (
 )
 
 // BannerGradient defines the smooth 9-color gradient: Mint Green -> Cyan -> Silver Grey.
+// These anchors are interpolated into a continuous ramp by gradient.go; the banner
+// samples that ramp once per display column so the sweep flows rather than stepping
+// letter by letter.
 var BannerGradient = []lipgloss.TerminalColor{
 	lipgloss.Color("#10B981"), // S: Vibrant Mint Green
 	lipgloss.Color("#14B8A6"), // K: Mint Teal
@@ -29,34 +32,41 @@ var (
 // SubtitleText provides context for the tool.
 const SubtitleText = "Terminal AI Agent Skill & MCP Context Overhead Optimizer [sky]"
 
-// RenderBanner renders the bold, blocky, yet simple and slim header for "SKILLYFIY"
-// with a mint green -> cyan -> silver grey gradient that dynamically adapts to screen size.
+// RenderBanner renders the banner with the gradient at its resting phase.
 func RenderBanner(width int) string {
+	return RenderBannerAnimated(width, 0)
+}
+
+// RenderBannerAnimated renders the banner with the gradient swept to phase,
+// using the un-rotated base ramp.
+func RenderBannerAnimated(width int, phase float64) string {
+	return RenderBannerWithRamp(width, phase, nil)
+}
+
+// RenderBannerWithRamp renders the banner by sampling lut once per column.
+// A nil lut falls back to the base ramp. The header stays bold, blocky and slim,
+// and adapts to narrow screens exactly as it did before it animated.
+func RenderBannerWithRamp(width int, phase float64, lut []lipgloss.Color) string {
 	w := width
 	if w <= 0 {
 		w = 80
 	}
+	if lut == nil {
+		lut = BaseRampLUT()
+	}
 
 	if w < 37 {
-		return CompactBanner(w)
+		return CompactBannerWithRamp(w, phase, lut)
 	}
 
-	// Normal and wide screens (>= 37 columns): render 2-line block letters
-	var r0, r1 strings.Builder
-	r0.WriteString(" ")
-	r1.WriteString(" ")
-	for i := 0; i < 9; i++ {
-		style := lipgloss.NewStyle().Foreground(BannerGradient[i]).Bold(true)
-		r0.WriteString(style.Render(bannerLettersRow0[i]))
-		r1.WriteString(style.Render(bannerLettersRow1[i]))
-		if i < 8 {
-			r0.WriteString(" ")
-			r1.WriteString(" ")
-		}
-	}
+	// Normal and wide screens (>= 37 columns): render 2-line block letters.
+	// Period is the row's own display width, so one full palette traversal spans
+	// the banner regardless of terminal size.
+	raw0 := " " + strings.Join(bannerLettersRow0, " ")
+	raw1 := " " + strings.Join(bannerLettersRow1, " ")
 
-	line0 := r0.String()
-	line1 := r1.String()
+	line0 := renderSweepLine(raw0, phase, lut)
+	line1 := renderSweepLine(raw1, phase, lut)
 
 	if lipgloss.Width(line0) >= w {
 		line0 = truncate.StringWithTail(line0, uint(w-1), "")
@@ -81,27 +91,27 @@ func RenderBanner(width int) string {
 	return line0 + "\n" + line1
 }
 
-// CompactBanner returns a single-line compact representation for narrow or zoomed-in terminals.
+// CompactBanner returns a single-line compact representation for narrow or zoomed-in
+// terminals, with the gradient at its resting phase.
 func CompactBanner(width ...int) string {
-	w := 80
-	if len(width) > 0 && width[0] > 0 {
-		w = width[0]
+	return CompactBannerWithRamp(firstWidth(width), 0, nil)
+}
+
+// CompactBannerWithRamp is CompactBanner with an explicit phase and ramp.
+func CompactBannerWithRamp(width int, phase float64, lut []lipgloss.Color) string {
+	w := width
+	if w <= 0 {
+		w = 80
+	}
+	if lut == nil {
+		lut = BaseRampLUT()
 	}
 
-	var b strings.Builder
-	b.WriteString(" ⚡ ")
-	rawChars := []rune("SKILLYFIY")
-	for i, ch := range rawChars {
-		style := lipgloss.NewStyle().Foreground(BannerGradient[i]).Bold(true)
-		b.WriteString(style.Render(string(ch)))
-	}
-	b.WriteString(" ")
-
+	line := renderSweepLine(" ⚡ SKILLYFIY ", phase, lut) + " "
 	if w >= 40 {
-		b.WriteString(SubtitleStyle.Render("— SKILLYFIY Optimizer"))
+		line += SubtitleStyle.Render("— SKILLYFIY Optimizer")
 	}
 
-	line := b.String()
 	if lipgloss.Width(line) >= w {
 		line = truncate.StringWithTail(line, uint(w-1), "")
 	}
@@ -110,10 +120,7 @@ func CompactBanner(width ...int) string {
 
 // BannerHeight returns the number of vertical terminal lines consumed by the banner.
 func BannerHeight(width ...int) int {
-	w := 80
-	if len(width) > 0 && width[0] > 0 {
-		w = width[0]
-	}
+	w := firstWidth(width)
 	if w >= 45 {
 		return 3
 	}
@@ -121,4 +128,12 @@ func BannerHeight(width ...int) int {
 		return 2
 	}
 	return 1
+}
+
+// firstWidth normalizes the optional width argument used by the compact helpers.
+func firstWidth(width []int) int {
+	if len(width) > 0 && width[0] > 0 {
+		return width[0]
+	}
+	return 80
 }

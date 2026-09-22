@@ -47,8 +47,31 @@ var (
 			Bold(true)
 
 	FilterBadgeStyle = lipgloss.NewStyle().
-			Foreground(ColorMintGreen).
+				Foreground(ColorMintGreen).
+				Background(ColorMutedBg).
+				Padding(0, 1).
+				Bold(true)
+
+	// Dedicated Command Mode (Ctrl+K)
+	CommandBoxStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ColorSeaGreen).
+			Padding(0, 1)
+
+	CommandPromptStyle = lipgloss.NewStyle().
+				Foreground(ColorSeaGreen).
+				Bold(true)
+
+	CommandFooterStyle = lipgloss.NewStyle().
+				Background(ColorMutedBg).
+				Foreground(ColorSeaGreen).
+				Padding(0, 1).
+				Bold(true)
+
+	// Footer Toast (transient animation-mode announcement)
+	ToastStyle = lipgloss.NewStyle().
 			Background(ColorMutedBg).
+			Foreground(ColorMintGreen).
 			Padding(0, 1).
 			Bold(true)
 

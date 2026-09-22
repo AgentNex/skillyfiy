@@ -17,6 +17,9 @@ import (
 type AgentItemDelegate struct {
 	VisualAnchor *int
 	SearchQuery  *string
+	// Anim is the shared animation clock. It is optional so the delegate still
+	// renders a static gradient when no clock is wired up.
+	Anim *animState
 }
 
 // NewAgentItemDelegate creates an item delegate with references to visual anchor and search query.
@@ -81,11 +84,8 @@ func (d AgentItemDelegate) Render(w io.Writer, m list.Model, index int, listItem
 		cursorStr = SearchPromptStyle.Render("❯ ")
 	}
 
-	// 3. Category Badge
-	badgeStr := SkillBadgeStyle.Render("SKILL")
-	if item.Type == model.TypeMCP {
-		badgeStr = MCPBadgeStyle.Render(" MCP ")
-	}
+	// 3. Category Badge (swept by the animation clock's badge phase)
+	badgeStr := d.badgeFor(item.Type)
 
 	// 4. Token Weight
 	tokenStr := TokenWeightStyle.Render(fmt.Sprintf("~%dtk", item.Tokens))
@@ -139,6 +139,23 @@ func (d AgentItemDelegate) Render(w io.Writer, m list.Model, index int, listItem
 	}
 
 	fmt.Fprintf(w, "%s\n%s", line1, line2)
+}
+
+// badgeFor renders the SKILL or MCP pill from the animated ramp. The two types
+// sample the ramp half a cycle apart so they stay visually distinct while both
+// sweep with the banner.
+func (d AgentItemDelegate) badgeFor(itemType model.ItemType) string {
+	phase := 0.0
+	lut := BaseRampLUT()
+	if d.Anim != nil {
+		phase = d.Anim.BadgePhase()
+		lut = d.Anim.LUT()
+	}
+
+	if itemType == model.TypeMCP {
+		return RampBadgeStyle(SampleRamp(lut, phase+BadgePairOffset)).Render(" MCP ")
+	}
+	return RampBadgeStyle(SampleRamp(lut, phase)).Render("SKILL")
 }
 
 // HighlightMatches highlights matched words or letters from query within target string.

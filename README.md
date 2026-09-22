@@ -16,7 +16,7 @@
 Accumulating hundreds of agent skills and MCP servers pollutes context windows, degrades reasoning performance, and inflates system prompt token costs. **Skillyfiy** provides an interactive, split-pane Terminal User Interface (TUI) designed to browse, inspect, and bulk-prune agent overhead with sub-millisecond responsiveness.
 
 ```
-┌── SKILLYFIY [sky] v0.2.4 ──────────────────────┬───────────────────────────────┐
+┌── SKILLYFIY [sky] v0.3.0 ──────────────────────┬───────────────────────────────┐
 │ / Search: [ scraper           ] [Sort] [Filter]│ INSPECTOR                     │
 ├────────────────────────────────────────────────┼───────────────────────────────┤
 │ ▶ [✓] [SKILL] web_scraper.py           1.2 KB  │ Target: web_scraper.py        │
@@ -63,6 +63,68 @@ Install the Skillyfiy (sky) CLI tool on my system:
 
 </details>
 
+## 🌈 Gradient Animation
+
+Skillyfiy's banner sweeps on its own — no key press required. The 9-color palette is
+interpolated into a continuous ramp and sampled **once per display column**, so the gradient
+flows smoothly across the letters instead of stepping from one tinted block to the next.
+
+| Surface | Behaviour |
+|---|---|
+| `SKILLYFIY` banner (full + compact) | Sweeps continuously |
+| `SKILL` / `MCP` item badges | Sweep, trailing the banner by 10% of the loop |
+| Reclaimed-token footer accent | Sweeps, trailing by 20% of the loop |
+| Help & confirm modal titles | Gradient-colored, frozen while the modal is open |
+| Sort/filter pills, search box | Static |
+
+The clock runs at a fixed 20 FPS (50 ms per frame) and **drops frames** rather than queuing
+work, so a slow or mobile terminal simply gets fewer frames instead of falling behind.
+Opening the Help overlay or the purge-confirmation modal pauses the sweep; closing it resumes
+from exactly the phase it stopped on.
+
+### Modes
+
+Cycle modes with the `/anim` command (see [Command Mode](#-command-mode)):
+
+```
+OFF  ->  SLOW  ->  NORMAL  ->  FAST  ->  HUE  ->  OFF
+```
+
+The tool launches in **NORMAL**, so the first `/anim` moves to `FAST`.
+
+| Mode | Loop duration | Notes |
+|---|---|---|
+| `OFF` | — | No animation; redraws stop entirely |
+| `SLOW` | 12s | |
+| `NORMAL` | 6s | Launch default |
+| `FAST` | 3s | |
+| `HUE` | 6s sweep | Also rotates the whole palette's hue, a full turn every 20s |
+
+### Opting out
+
+Every animation mode is session-only, so nothing is written to disk. Disable it for a run with:
+
+```bash
+sky --no-animation
+```
+
+The animation also stays off automatically when `NO_COLOR` is set or `TERM=dumb`, since a
+color-less terminal cannot show a sweep.
+
+## ⌨️ Command Mode
+
+Press `Ctrl+K` to turn the search box into a dedicated command line. A leading `/` is optional,
+so `/anim` and `anim` both work. Press `Enter` to run the command or `Esc` to return to normal
+filtering.
+
+| Command | Effect |
+|---|---|
+| `/anim` | Cycle the gradient animation: OFF → SLOW → NORMAL → FAST → HUE → OFF |
+
+The result is announced in the footer for a couple of seconds. While a command is being typed,
+the list is **not** filtered, so command text never hides your items. An active multi-select or
+pinned span still takes priority in the footer.
+
 ## 🎮 Navigation & Keybindings
 
 | Key | Action |
@@ -73,6 +135,7 @@ Install the Skillyfiy (sky) CLI tool on my system:
 | `s` | Pin span anchor on start item; scroll; press `s` again on end item to select range |
 | `Ctrl+A` | Toggle select/deselect all visible items |
 | `/` | Focus search bar (**press `/` again to exit/blur search**) |
+| `Ctrl+K` | Open **Command Mode** — type `/anim` to cycle the gradient animation |
 | `Ctrl+S` / `F1` | Cycle 6 sort modes (Newest, Oldest, Largest, Smallest, A-Z, Z-A) |
 | `Ctrl+T` / `F2` | Cycle 3 resource filters (All, Skills, MCP Servers) |
 | `Tab` | Switch focus between List pane and Inspector pane |
@@ -97,6 +160,9 @@ sky --skills /path/to/custom/skills
 
 # Specify custom MCP configuration file
 sky --mcp /path/to/claude_desktop_config.json
+
+# Start with the gradient animation disabled (cycle it on later with /anim)
+sky --no-animation
 
 # Display help menu
 sky --help

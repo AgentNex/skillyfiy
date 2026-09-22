@@ -9,8 +9,17 @@ import (
 	"skillyfiy/internal/model"
 )
 
-// RenderConfirmModal creates the centered Dry-Run Summary Modal overlay.
+// RenderConfirmModal creates the centered Dry-Run Summary Modal overlay with the
+// gradient at its resting phase.
 func RenderConfirmModal(items []model.AgentItem, width, height int, dryRun bool) string {
+	return RenderConfirmModalAnimated(items, width, height, dryRun, 0, nil)
+}
+
+// RenderConfirmModalAnimated is the confirm overlay with a frozen gradient tint on
+// its title. The animation is paused while this modal is open, so the title shows
+// the sweep at the phase it stopped on. The irreversible-action wording below the
+// title deliberately stays warning red.
+func RenderConfirmModalAnimated(items []model.AgentItem, width, height int, dryRun bool, phase float64, lut []lipgloss.Color) string {
 	var skillCount int
 	var mcpCount int
 	var totalTokens int
@@ -35,7 +44,7 @@ func RenderConfirmModal(items []model.AgentItem, width, height int, dryRun bool)
 	}
 
 	var b strings.Builder
-	b.WriteString(ModalTitleStyle.Render(title) + "\n\n")
+	b.WriteString(renderSweepLine(title, phase, lut) + "\n\n")
 
 	b.WriteString(NormalTitleStyle.Render("Review resources scheduled for removal:") + "\n\n")
 

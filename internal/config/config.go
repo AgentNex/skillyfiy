@@ -15,7 +15,10 @@ type Config struct {
 	MCPPath    string
 	ConfigPath string
 	DryRun     bool
-	Version    string
+	// NoAnimation disables the automatic gradient sweep at launch. The animation
+	// can still be cycled on at runtime with the /anim command.
+	NoAnimation bool
+	Version     string
 }
 
 // DefaultSkillsPath returns the standard agent skills directory path (~/.agent/skills).
@@ -112,6 +115,7 @@ func ParseFlags() (*Config, bool) {
 	mcpFlag := flag.String("mcp", "", "Path to MCP JSON config (default: ~/.claude/settings.json)")
 	configFlag := flag.String("config", "", "Optional custom configuration file path")
 	dryRunFlag := flag.Bool("dry-run", false, "Simulate purge without writing changes or deleting files")
+	noAnimFlag := flag.Bool("no-animation", false, "Start with the gradient animation disabled (cycle it back on with /anim)")
 	versionFlag := flag.Bool("v", false, "Print current version and exit")
 	versionLongFlag := flag.Bool("version", false, "Print current version and exit")
 
@@ -125,6 +129,7 @@ func ParseFlags() (*Config, bool) {
 		fmt.Printf("  --mcp <path>         Custom path to MCP configuration file\n")
 		fmt.Printf("  --config <path>      Custom path to generic configuration\n")
 		fmt.Printf("  --dry-run            Simulate purge without writing changes or deleting files\n")
+		fmt.Printf("  --no-animation       Start with the gradient animation disabled\n")
 		fmt.Printf("  -h, --help           Show help documentation\n\n")
 		fmt.Printf("Keybindings:\n")
 		fmt.Printf("  Space / x            Toggle single item\n")
@@ -135,6 +140,7 @@ func ParseFlags() (*Config, bool) {
 		fmt.Printf("  Ctrl+S / F1          Cycle sort mode (Newest, Oldest, Largest, Smallest, A-Z, Z-A)\n")
 		fmt.Printf("  Ctrl+T / F2          Cycle type filter (All, Skills, MCP)\n")
 		fmt.Printf("  /                    Focus search bar (press '/' again to exit)\n")
+		fmt.Printf("  Ctrl+K               Open command mode, then type /anim to cycle the gradient animation\n")
 		fmt.Printf("  i / ?                Toggle keybindings help modal overlay\n")
 		fmt.Printf("  Enter                Review and confirm purge\n")
 		fmt.Printf("  Ctrl+Q / Esc         Exit without making changes\n")
@@ -148,5 +154,6 @@ func ParseFlags() (*Config, bool) {
 	}
 
 	cfg := Load(*skillsFlag, *mcpFlag, *configFlag, *dryRunFlag)
+	cfg.NoAnimation = *noAnimFlag
 	return cfg, false
 }

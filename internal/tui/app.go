@@ -2,8 +2,10 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -31,6 +33,12 @@ const (
 	paneInspector
 )
 
+// SearchPlaceholder is the resting placeholder of the search box.
+const SearchPlaceholder = "Search skills, MCPs, paths..."
+
+// CommandPlaceholder advertises the command surface inside command mode.
+const CommandPlaceholder = "type a command — /anim cycles the animation"
+
 // AppModel is the top-level Bubble Tea model orchestrating the Skillyfiy TUI.
 type AppModel struct {
 	cfg             *config.Config
@@ -45,6 +53,14 @@ type AppModel struct {
 	multiSelectMode bool
 	showHelpOverlay bool
 	searchQuery     string
+
+	// anim is the shared gradient clock. It is held by pointer so that every
+	// copy Bubble Tea makes of this model drives and observes one clock.
+	anim            *animState
+	animUnsupported bool
+	commandMode     bool
+	toast           string
+	toastSeq        int
 
 	allItems    []model.AgentItem
 	selectedMap map[string]bool
@@ -65,7 +81,7 @@ func NewApp(cfg *config.Config, items []model.AgentItem) AppModel {
 // NewAppModel initializes the Bubble Tea application state.
 func NewAppModel(cfg *config.Config, items []model.AgentItem) AppModel {
 	ti := textinput.New()
-	ti.Placeholder = "Search skills, MCPs, paths..."
+	ti.Placeholder = SearchPlaceholder
 	ti.Prompt = SearchPromptStyle.Render("❯ ")
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(ColorMintBlue).Bold(true)
 	ti.TextStyle = SearchTextStyle
@@ -94,6 +110,15 @@ func NewAppModel(cfg *config.Config, items []model.AgentItem) AppModel {
 		}
 	}
 
+	// The animation runs by default; it is opted out of by --no-animation or by a
+	// terminal that cannot render color.
+	animUnsupported := false
+	initialMode := AnimNormal
+	if noAnim := cfg != nil && cfg.NoAnimation; noAnim || !AnimationSupported(os.Getenv) {
+		initialMode = AnimOff
+		animUnsupported = !noAnim
+	}
+
 	app := AppModel{
 		cfg:             cfg,
 		keys:            config.DefaultKeyMap,
@@ -113,16 +138,107 @@ func NewAppModel(cfg *config.Config, items []model.AgentItem) AppModel {
 		list:            l,
 		inspector:       inspector,
 		delegate:        delegate,
+		anim:            NewAnimState(initialMode),
+		animUnsupported: animUnsupported,
 	}
+
+	// The delegate reads the clock directly, so it never needs re-syncing.
+	app.delegate.Anim = app.anim
 
 	app.recalculateSizes()
 	app.updateListItems()
 	return app
 }
 
-// Init triggers initial commands.
+// Init triggers initial commands, starting the gradient animation clock.
 func (m AppModel) Init() tea.Cmd {
-	return nil
+	return m.tickCmd()
+}
+
+// animPaused reports whether the animation should be frozen. Modals demand
+// attention, so the sweep stops while either of them is on screen.
+func (m AppModel) animPaused() bool {
+	return m.state == stateConfirm || m.showHelpOverlay
+}
+
+// tickCmd schedules the next animation frame, or returns nil when the animation is
+// off, unsupported, paused, or already awaiting a frame.
+//
+// Requiring the in-flight flag to be clear before scheduling is what drops frames
+// on slow terminals: a frame that is still being rendered simply never queues a
+// second one behind it.
+func (m *AppModel) tickCmd() tea.Cmd {
+	if m.animUnsupported || !m.anim.Enabled() || m.animPaused() || m.anim.tickInFlight {
+		return nil
+	}
+	m.anim.tickInFlight = true
+	return animTickCmd(m.anim.Tick())
+}
+
+// setToast posts a transient footer notice.
+func (m *AppModel) setToast(text string) tea.Cmd {
+	m.toast = text
+	m.toastSeq++
+	seq := m.toastSeq
+	return tea.Tick(ToastDuration, func(time.Time) tea.Msg {
+		return toastMsg{seq: seq}
+	})
+}
+
+// enterCommandMode focuses the search box as a dedicated command line.
+func (m *AppModel) enterCommandMode() {
+	m.commandMode = true
+	m.searchInput.SetValue("")
+	m.applyCommandModePrompt()
+	m.searchInput.Focus()
+}
+
+// applyCommandModePrompt swaps the prompt and placeholder for command entry.
+func (m *AppModel) applyCommandModePrompt() {
+	m.searchInput.Prompt = CommandPromptStyle.Render("/ ")
+	m.searchInput.Placeholder = CommandPlaceholder
+}
+
+// exitCommandMode leaves command mode, restoring normal filtering. Plain search
+// blurring keeps whatever filter was typed, exactly as it did before.
+func (m *AppModel) exitCommandMode() {
+	if !m.commandMode {
+		m.searchInput.Blur()
+		m.syncDelegateQuery()
+		return
+	}
+
+	m.commandMode = false
+	m.searchInput.SetValue("")
+	m.searchInput.Prompt = SearchPromptStyle.Render("❯ ")
+	m.searchInput.Placeholder = SearchPlaceholder
+	m.searchInput.Blur()
+
+	// Command text was never a filter, so rebuild the list unfiltered.
+	m.updateListItems()
+}
+
+// runCommand executes a command-mode input and returns any resulting commands.
+func (m *AppModel) runCommand(input string) tea.Cmd {
+	name, arg, ok := ParseCommand(input)
+	if !ok {
+		return m.setToast("No command entered — try /anim")
+	}
+
+	switch name {
+	case "anim":
+		if arg != "" {
+			return m.setToast("Use bare /anim to cycle animation modes")
+		}
+		if m.animUnsupported {
+			return m.setToast("Animation unavailable (NO_COLOR / TERM=dumb)")
+		}
+		mode := m.anim.Cycle()
+		// Cycling back on must also restart the clock.
+		return tea.Batch(m.setToast("Animation: "+mode.Label()), m.tickCmd())
+	}
+
+	return m.setToast(fmt.Sprintf("Unknown command: /%s — try /anim", name))
 }
 
 // Update processes terminal messages and key inputs.
@@ -134,6 +250,23 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.recalculateSizes()
+		return m, nil
+
+	case animTickMsg:
+		// A frame came back, so the next one may be scheduled. If the animation was
+		// paused or switched off meanwhile, the clock simply stops here.
+		m.anim.tickInFlight = false
+		if m.animUnsupported || !m.anim.Enabled() || m.animPaused() {
+			return m, nil
+		}
+		m.anim.Advance()
+		return m, m.tickCmd()
+
+	case toastMsg:
+		// Ignore expiry from a superseded toast.
+		if msg.seq == m.toastSeq {
+			m.toast = ""
+		}
 		return m, nil
 
 	case tea.KeyMsg:
@@ -156,7 +289,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			case "n", "N", "esc":
 				m.state = stateMain
-				return m, nil
+				// Leaving the modal resumes the sweep from the exact frozen phase.
+				return m, m.tickCmd()
 			default:
 				return m, nil
 			}
@@ -167,24 +301,55 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "i", "I", "esc", "q", "enter", "?":
 				m.showHelpOverlay = false
-				return m, nil
+				return m, m.tickCmd()
 			default:
 				return m, nil
 			}
 		}
 
+		// Command mode toggle, available from the dashboard and from search.
+		if key.Matches(msg, m.keys.CommandMode) {
+			if m.commandMode {
+				m.exitCommandMode()
+				return m, nil
+			}
+			m.enterCommandMode()
+			return m, textinput.Blink
+		}
+
 		// State: Main Dashboard
 		// If Search Input is focused:
 		if m.searchInput.Focused() {
-			if msg.String() == "/" || msg.Type == tea.KeyEsc || msg.Type == tea.KeyEnter {
-				m.searchInput.Blur()
-				m.syncDelegateQuery()
+			if m.commandMode {
+				// Inside command mode Enter runs the command and Esc cancels it.
+				// Every other key, including a leading '/', is command text.
+				switch msg.Type {
+				case tea.KeyEnter:
+					cmd := m.runCommand(m.searchInput.Value())
+					m.exitCommandMode()
+					return m, cmd
+				case tea.KeyEsc:
+					m.exitCommandMode()
+					return m, nil
+				}
+			} else if msg.String() == "/" || msg.Type == tea.KeyEsc || msg.Type == tea.KeyEnter {
+				// Plain search keeps its original '/'/'esc'/'enter' blur shortcuts.
+				m.exitCommandMode()
 				return m, nil
 			}
 			var cmd tea.Cmd
 			prevVal := m.searchInput.Value()
 			m.searchInput, cmd = m.searchInput.Update(msg)
-			if m.searchInput.Value() != prevVal {
+			val := m.searchInput.Value()
+			switch {
+			case m.commandMode:
+				// Composing a command: filtering stays suspended so the command text
+				// never narrows the list.
+			case strings.HasPrefix(strings.TrimSpace(val), "/"):
+				// A leading slash is always a command, never a filter.
+				m.commandMode = true
+				m.applyCommandModePrompt()
+			case val != prevVal:
 				m.updateListItems()
 			}
 			return m, cmd
@@ -286,17 +451,18 @@ func (m AppModel) View() string {
 	}
 
 	if m.state == stateConfirm {
-		return RenderConfirmModal(m.allItems, m.width, m.height, m.cfg.DryRun)
+		// Paused while open, so the title shows the gradient frozen at this phase.
+		return RenderConfirmModalAnimated(m.allItems, m.width, m.height, m.cfg.DryRun, m.anim.Phase(), m.anim.LUT())
 	}
 
 	if m.showHelpOverlay {
-		return RenderHelpModal(m.width, m.height)
+		return RenderHelpModalAnimated(m.width, m.height, m.anim.Phase(), m.anim.LUT())
 	}
 
 	var b strings.Builder
 
-	// 1. Header Banner
-	bannerStr := RenderBanner(m.width)
+	// 1. Header Banner — swept by the animation clock.
+	bannerStr := RenderBannerWithRamp(m.width, m.anim.Phase(), m.anim.LUT())
 	b.WriteString(bannerStr + "\n")
 
 	// 2. Search Prompt Box with Sort and Filter Badges
@@ -327,7 +493,11 @@ func (m AppModel) View() string {
 		lipgloss.NewStyle().Width(availSearchWidth).Render(m.searchInput.View()),
 		badges,
 	)
-	b.WriteString(SearchBoxStyle.Width(boxWidth).Render(searchBoxContent) + "\n")
+	boxStyle := SearchBoxStyle
+	if m.commandMode {
+		boxStyle = CommandBoxStyle
+	}
+	b.WriteString(boxStyle.Width(boxWidth).Render(searchBoxContent) + "\n")
 
 	// 3. Middle Content (Split View or Stacked/Toggle View)
 	listStyle := LeftPaneStyle
@@ -446,6 +616,17 @@ func (m *AppModel) renderFooter() string {
 		return truncate.StringWithTail(FooterVisualModeStyle.Render(msg), uint(m.width-1), "")
 	}
 
+	// The command hint and the toast sit below selection state, so an active
+	// multi-select or pinned span always wins the footer.
+	if m.commandMode {
+		msg := " -- COMMAND MODE -- type /anim then [Enter] to cycle the animation (Esc cancels) "
+		return truncate.StringWithTail(CommandFooterStyle.Render(msg), uint(m.width-1), "")
+	}
+
+	if m.toast != "" {
+		return truncate.StringWithTail(ToastStyle.Render(" "+m.toast+" "), uint(m.width-1), "")
+	}
+
 	selectedCount := m.getSelectedCount()
 	reclaimedTokens := m.getReclaimedTokens()
 
@@ -459,18 +640,22 @@ func (m *AppModel) renderFooter() string {
 	}
 	leftFormatted := FooterStyle.Render(leftHints)
 
+	// The reclaimed-token accent sweeps with the footer's phase-lagged ramp.
+	reclaimedStyled := RampTextStyle(SampleRamp(m.anim.LUT(), m.anim.FooterPhase())).
+		Render(fmt.Sprintf("~%d tk", reclaimedTokens))
+
 	var statusInfo string
 	if m.width >= 65 {
 		statusInfo = fmt.Sprintf("Selected: %s/%d  Reclaimed: %s",
 			FooterSelectedCountStyle.Render(fmt.Sprintf("%d", selectedCount)),
 			len(m.allItems),
-			FooterReclaimedStyle.Render(fmt.Sprintf("~%d tk", reclaimedTokens)),
+			reclaimedStyled,
 		)
 	} else {
-		statusInfo = fmt.Sprintf("%s/%d (~%dtk)",
+		statusInfo = fmt.Sprintf("%s/%d (%s)",
 			FooterSelectedCountStyle.Render(fmt.Sprintf("%d", selectedCount)),
 			len(m.allItems),
-			reclaimedTokens,
+			reclaimedStyled,
 		)
 	}
 	rightFormatted := lipgloss.NewStyle().Padding(0, 1).Render(statusInfo)

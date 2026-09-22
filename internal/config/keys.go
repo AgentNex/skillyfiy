@@ -11,6 +11,7 @@ type KeyMap struct {
 	VisualSpan   key.Binding
 	SelectAll    key.Binding
 	FocusSearch  key.Binding
+	CommandMode  key.Binding
 	SwitchPane   key.Binding
 	CycleSort    key.Binding
 	CycleFilter  key.Binding
@@ -29,6 +30,7 @@ var DefaultKeyMap = KeyMap{
 	VisualSpan:   key.NewBinding(key.WithKeys("s", "S"), key.WithHelp("s", "set/lock span")),
 	SelectAll:    key.NewBinding(key.WithKeys("ctrl+a"), key.WithHelp("ctrl+a", "select all")),
 	FocusSearch:  key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
+	CommandMode:  key.NewBinding(key.WithKeys("ctrl+k"), key.WithHelp("ctrl+k", "command mode")),
 	SwitchPane:   key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch pane")),
 	CycleSort:    key.NewBinding(key.WithKeys("f1", "ctrl+s"), key.WithHelp("ctrl+s/f1", "cycle sort")),
 	CycleFilter:  key.NewBinding(key.WithKeys("f2", "ctrl+t"), key.WithHelp("ctrl+t/f2", "cycle filter")),
