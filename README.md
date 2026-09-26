@@ -5,6 +5,7 @@
 
 [![Go Version](https://img.shields.io/github/go-mod/go-version/AgentNex/skillyfiy?style=flat-square&color=10B981)](https://go.dev/)
 [![Release](https://img.shields.io/github/v/release/AgentNex/skillyfiy?style=flat-square&color=38BDF8)](https://github.com/AgentNex/skillyfiy/releases)
+[![Deploy with Vercel](https://img.shields.io/badge/Deploy%20to-Vercel-black?style=flat-square&logo=vercel)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FAgentNex%2Fskillyfiy&root-directory=mcp&project-name=skillyfiy-mcp&repository-name=skillyfiy-mcp)
 [![License](https://img.shields.io/badge/License-MIT-slate?style=flat-square)](LICENSE)
 [![Zero-CGO](https://img.shields.io/badge/CGO-Zero%20Dependencies-059669?style=flat-square)](#)
 
@@ -167,6 +168,21 @@ sky --no-animation
 # Display help menu
 sky --help
 ```
+
+## 🌐 Self-Hostable Free MCP Server (Vercel)
+
+Skillyfiy includes a production-ready, self-hostable **Model Context Protocol (MCP) Server** running on Vercel's free serverless tier with **zero React/Next.js overhead**. It allows AI coding assistants (Claude Desktop, Cursor, Antigravity, Claude Code, Windsurf, Cline) to query available agent skills, fetch full skill documentation, generate copy-paste MCP configurations, and dynamically evaluate prompt token overhead.
+
+### 🚀 1-Click Free Deploy to Vercel
+
+Deploy your own private MCP server to Vercel's free tier with a single click:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FAgentNex%2Fskillyfiy&root-directory=mcp&project-name=skillyfiy-mcp&repository-name=skillyfiy-mcp)
+
+* **Endpoints**: Live SSE & HTTP POST at `/api/mcp`
+* **Interactive Dashboard**: Modern dark-mode web dashboard served from `/` (built with vanilla HTML5/Tailwind/ES2022)
+* **Dedicated MCP Documentation**: See [mcp/README.md](mcp/README.md) for complete architecture, tool specs, and client configs.
+* **Autonomous Setup Prompt**: Copy [mcp/AGENT_SETUP_PROMPT.md](mcp/AGENT_SETUP_PROMPT.md) to have your AI agent automatically configure itself with your deployed endpoint.
 
 ## 🗑️ Uninstallation
 

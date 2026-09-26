@@ -1,0 +1,34 @@
+{
+  "name": "skillyfiy-mcp",
+  "version": "1.0.0",
+  "description": "Self-hostable Model Context Protocol (MCP) server for discovering agent skills, inspecting documentation, and optimizing context token overhead.",
+  "main": "api/mcp.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch api/dev-server.ts",
+    "build": "tsc --noEmit",
+    "test": "tsx test/mcp.test.ts"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai-agents",
+    "agent-skills",
+    "vercel",
+    "serverless",
+    "skillyfiy"
+  ],
+  "author": "AgentNex",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "@modelcontextprotocol/server": "^2.1.0",
+    "mcp-handler": "^2.2.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

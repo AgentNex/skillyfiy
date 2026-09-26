@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skillyfiy MCP Server — Zero-Overhead Agent Skill Registry</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              mint: '#10B981',
+              teal: '#14B8A6',
+              cyan: '#06B6D4',
+              sky: '#38BDF8',
+              slate: '#0B0F19',
+              card: '#111827',
+              border: '#1F2937'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .pulse-dot {
+      animation: pulse-subtle 2s infinite ease-in-out;
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #10B981, #06B6D4, #CBD5E1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  </style>
+</head>
+<body class="bg-[#0B0F19] text-gray-100 min-h-screen flex flex-col font-sans selection:bg-brand-mint selection:text-black">
+
+  <!-- Navigation Header -->
+  <header class="border-b border-gray-800 bg-[#0B0F19]/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <span class="text-2xl font-bold tracking-tight gradient-text">SKILLYFIY MCP</span>
+        <span class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 flex items-center gap-1.5 font-medium">
+          <span class="h-2 w-2 rounded-full bg-emerald-400 pulse-dot"></span>
+          Endpoint Online
+        </span>
+      </div>
+      <div class="flex items-center space-x-4 text-sm">
+        <a href="https://github.com/AgentNex/skillyfiy" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-white transition flex items-center gap-1.5">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+        <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FAgentNex%2Fskillyfiy&root-directory=mcp&project-name=skillyfiy-mcp&repository-name=skillyfiy-mcp" target="_blank" rel="noopener noreferrer" class="hidden sm:inline-block">
+          <img src="https://vercel.com/button" alt="Deploy with Vercel" class="h-7">
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <main class="max-w-6xl mx-auto px-4 py-12 flex-grow space-y-12">
+    <div class="text-center max-w-3xl mx-auto space-y-4">
+      <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight">
+        Self-Hosted MCP Server for <span class="gradient-text">Agent Skills</span>
+      </h1>
+      <p class="text-gray-400 text-lg leading-relaxed">
+        Free, self-hostable Model Context Protocol (MCP) endpoint on Vercel. Enables AI agents (Claude, Cursor, Antigravity, Windsurf) to discover skills, read documentation, search MCP servers, and audit prompt token overhead.
+      </p>
+      
+      <!-- 1-Click Deploy Banner -->
+      <div class="pt-4 flex flex-wrap items-center justify-center gap-4">
+        <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FAgentNex%2Fskillyfiy&root-directory=mcp&project-name=skillyfiy-mcp&repository-name=skillyfiy-mcp" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-6 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-semibold shadow-lg shadow-emerald-500/20 transition transform active:scale-95">
+          <svg class="w-5 h-5 mr-2 fill-current" viewBox="0 0 24 24"><path d="M24 22.525H0l12-21.05 12 21.05z"/></svg>
+          Deploy Your Own Free Instance (1-Click)
+        </a>
+        <a href="#setup-section" class="px-5 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 font-medium transition">
+          Connect Your Agent
+        </a>
+      </div>
+    </div>
+
+    <!-- Active Endpoint Indicator Card -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-xl">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="text-xs uppercase tracking-wider text-emerald-400 font-semibold mb-1">Your Live MCP Endpoint</div>
+          <div class="font-mono text-cyan-400 text-base sm:text-lg break-all select-all" id="endpoint-display">
+            https://your-domain.vercel.app/api/mcp
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="copyEndpoint()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm font-medium transition flex items-center gap-1.5" id="copy-endpoint-btn">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+            Copy Endpoint
+          </button>
+          <a href="/api/health" target="_blank" class="px-4 py-2 bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/60 rounded-lg text-sm font-medium transition">
+            Check Health (JSON)
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interactive Client Setup Section -->
+    <section id="setup-section" class="space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-2xl font-bold">1. Connect Your AI Agent</h2>
+          <p class="text-gray-400 text-sm">Select your client to generate the exact JSON configuration block.</p>
+        </div>
+        <div class="text-xs text-gray-500 bg-gray-900 border border-gray-800 px-3 py-1.5 rounded-lg">
+          Zero React · Pure SSE & Stream
+        </div>
+      </div>
+
+      <!-- Client Selector Tabs -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
+        <button onclick="selectClient('claude')" id="tab-claude" class="client-tab active px-3 py-2.5 rounded-lg text-sm font-medium border border-emerald-500 bg-emerald-950/40 text-emerald-300 transition text-center">
+          Claude Desktop
+        </button>
+        <button onclick="selectClient('cursor')" id="tab-cursor" class="client-tab px-3 py-2.5 rounded-lg text-sm font-medium border border-gray-800 bg-gray-900 hover:border-gray-700 text-gray-300 transition text-center">
+          Cursor IDE
+        </button>
+        <button onclick="selectClient('antigravity')" id="tab-antigravity" class="client-tab px-3 py-2.5 rounded-lg text-sm font-medium border border-gray-800 bg-gray-900 hover:border-gray-700 text-gray-300 transition text-center">
+          Antigravity CLI
+        </button>
+        <button onclick="selectClient('claudecode')" id="tab-claudecode" class="client-tab px-3 py-2.5 rounded-lg text-sm font-medium border border-gray-800 bg-gray-900 hover:border-gray-700 text-gray-300 transition text-center">
+          Claude Code
+        </button>
+        <button onclick="selectClient('windsurf')" id="tab-windsurf" class="client-tab px-3 py-2.5 rounded-lg text-sm font-medium border border-gray-800 bg-gray-900 hover:border-gray-700 text-gray-300 transition text-center">
+          Windsurf
+        </button>
+        <button onclick="selectClient('cline')" id="tab-cline" class="client-tab px-3 py-2.5 rounded-lg text-sm font-medium border border-gray-800 bg-gray-900 hover:border-gray-700 text-gray-300 transition text-center">
+          Cline / Roo
+        </button>
+      </div>
+
+      <!-- Config Code Box -->
+      <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-2xl">
+        <div class="bg-gray-950/80 px-4 py-2.5 border-b border-gray-800 flex items-center justify-between text-xs">
+          <span class="font-mono text-gray-400" id="config-path-label">Config Location: ~/Library/Application Support/Claude/claude_desktop_config.json</span>
+          <button onclick="copyConfig()" class="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-semibold transition" id="copy-config-btn">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+            Copy Snippet
+          </button>
+        </div>
+        <pre class="p-4 font-mono text-sm text-cyan-300 overflow-x-auto leading-relaxed" id="config-code-block"></pre>
+      </div>
+    </section>
+
+    <!-- Automated Agent Setup Prompt Section -->
+    <section class="space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-2xl font-bold">2. Automated Setup via AI Agent</h2>
+          <p class="text-gray-400 text-sm">Don't want to edit files manually? Paste this prompt to your AI agent and it will configure itself.</p>
+        </div>
+      </div>
+
+      <div class="bg-gradient-to-r from-gray-900 to-gray-950 border border-emerald-500/30 rounded-xl p-6 relative shadow-lg">
+        <div class="flex items-start justify-between gap-4 mb-3">
+          <div class="flex items-center gap-2">
+            <span class="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+            <span class="text-sm font-semibold text-emerald-400 uppercase tracking-wide">Universal Agent Auto-Install Prompt</span>
+          </div>
+          <button onclick="copyAgentPrompt()" class="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg text-xs font-bold transition flex items-center gap-1 shadow" id="copy-prompt-btn">
+            Copy Prompt
+          </button>
+        </div>
+        <pre class="bg-black/60 p-4 rounded-lg font-mono text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap leading-relaxed border border-gray-800" id="agent-prompt-text">Please configure the Skillyfiy MCP Server into our active MCP configuration file.
+Endpoint URL: <span class="text-emerald-400 current-url"></span>/api/mcp
+
+Instructions for the Agent:
+1. Locate the active MCP settings file for this environment (e.g., claude_desktop_config.json, .cursor/mcp.json, or mcp_config.json).
+2. Add the 'skillyfiy' server entry under 'mcpServers' pointing to the above endpoint.
+3. Test connectivity and list the available tools (search_skills, get_skill_doc, search_mcp_servers, calculate_overhead).
+4. Report back once completed.</pre>
+      </div>
+    </section>
+
+    <!-- Interactive Catalog Explorer -->
+    <section class="space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-2xl font-bold">3. Live Registry Explorer</h2>
+          <p class="text-gray-400 text-sm">Inspect available skills and MCP servers provided by this endpoint.</p>
+        </div>
+        <div class="w-full sm:w-72">
+          <input type="text" id="search-input" oninput="filterCatalog()" placeholder="Search skills, tools, tags..." class="w-full px-3.5 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition">
+        </div>
+      </div>
+
+      <!-- Category Filter Pills -->
+      <div class="flex flex-wrap gap-2 text-xs" id="category-pills">
+        <button onclick="filterCategory('all')" class="cat-pill active px-3 py-1.5 rounded-full border border-emerald-500 bg-emerald-950/60 text-emerald-300 font-medium transition">All</button>
+        <button onclick="filterCategory('architecture')" class="cat-pill px-3 py-1.5 rounded-full border border-gray-800 bg-gray-900 text-gray-400 hover:text-white transition">Architecture</button>
+        <button onclick="filterCategory('frontend')" class="cat-pill px-3 py-1.5 rounded-full border border-gray-800 bg-gray-900 text-gray-400 hover:text-white transition">Frontend</button>
+        <button onclick="filterCategory('testing')" class="cat-pill px-3 py-1.5 rounded-full border border-gray-800 bg-gray-900 text-gray-400 hover:text-white transition">Testing</button>
+        <button onclick="filterCategory('backend')" class="cat-pill px-3 py-1.5 rounded-full border border-gray-800 bg-gray-900 text-gray-400 hover:text-white transition">Backend</button>
+        <button onclick="filterCategory('devops')" class="cat-pill px-3 py-1.5 rounded-full border border-gray-800 bg-gray-900 text-gray-400 hover:text-white transition">DevOps</button>
+        <button onclick="filterCategory('ai-agents')" class="cat-pill px-3 py-1.5 rounded-full border border-gray-800 bg-gray-900 text-gray-400 hover:text-white transition">AI Agents</button>
+      </div>
+
+      <!-- Skills Cards Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="skills-grid">
+        <!-- Rendered dynamically by vanilla JS -->
+      </div>
+    </section>
+
+    <!-- Modal for Skill Documentation -->
+    <div id="doc-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+      <div class="bg-gray-900 border border-gray-800 rounded-xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between bg-gray-950">
+          <div class="flex items-center gap-2">
+            <span class="text-xs px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500/40 text-emerald-400 font-mono">SKILL.md</span>
+            <h3 class="font-bold text-lg text-white" id="modal-skill-title"></h3>
+          </div>
+          <button onclick="closeDocModal()" class="text-gray-400 hover:text-white text-xl font-bold px-2 py-1">&times;</button>
+        </div>
+        <div class="p-6 overflow-y-auto space-y-4 flex-grow font-sans text-sm text-gray-300 leading-relaxed whitespace-pre-wrap" id="modal-skill-body"></div>
+        <div class="px-6 py-3 border-t border-gray-800 bg-gray-950 flex justify-end">
+          <button onclick="closeDocModal()" class="px-4 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm font-medium">Close</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-800 py-6 text-center text-xs text-gray-500 space-y-1">
+    <div>Part of the <a href="https://github.com/AgentNex/skillyfiy" class="text-emerald-400 hover:underline">Skillyfiy Context Optimization Suite</a></div>
+    <div>Zero React · Pure Web Standard Vercel Serverless Function · Free Plan Compatible</div>
+  </footer>
+
+  <script>
+    // Embedded sample catalog for instant zero-latency client-side exploration
+    const CATALOG = [
+      {
+        name: 'architect-review',
+        category: 'architecture',
+        tokens: 1420,
+        desc: 'Master software architect specializing in scalable microservices, clean architecture, and technical debt audit.',
+        tags: ['architecture', 'system-design', 'clean-code'],
+        content: '# Architect Review Skill\n\nComprehensive architectural review framework evaluating decoupling, scalability, data flow boundaries, and operational complexity.\n\n## Principles\n1. Separation of Concerns: Domain logic must remain independent of framework and transport layers.\n2. Failure Isolation: High-frequency failure paths must have circuit breakers and explicit recovery mechanisms.'
+      },
+      {
+        name: 'test-driven-development',
+        category: 'testing',
+        tokens: 1250,
+        desc: 'Strict Red-Green-Refactor test-driven development workflow to ensure bug-free, regression-resistant implementations.',
+        tags: ['tdd', 'unit-tests', 'refactor', 'quality'],
+        content: '# Test-Driven Development (TDD) Skill\n\nExecute disciplined test-first development across any programming language.\n\n## Workflow Phases\n1. Red: Write a minimal failing test.\n2. Green: Implement the minimal code.\n3. Refactor: Polish without breaking assertions.'
+      },
+      {
+        name: 'animejs-animation',
+        category: 'frontend',
+        tokens: 1100,
+        desc: 'High-performance JavaScript animation skill using Anime.js for smooth SVG morphing and staggered timelines.',
+        tags: ['animation', 'javascript', 'svg', 'frontend'],
+        content: '# Anime.js Animation Skill\n\nPatterns for creating fluid web animations using Anime.js.\n\n## Core Capabilities\n- Staggered grid animations with directional delay.\n- Seamless SVG path morphing.'
+      },
+      {
+        name: 'cloudflare-workers-expert',
+        category: 'devops',
+        tokens: 1680,
+        desc: 'Cloudflare Workers and Serverless Edge architecture: KV, R2, D1, Durable Objects, and sub-millisecond edge API routing.',
+        tags: ['cloudflare', 'workers', 'edge', 'serverless'],
+        content: '# Cloudflare Workers Expert Skill\n\nBuild and deploy globally distributed edge services with instant cold starts and minimal latency.\n\n## Edge Principles\n- Utilize Hono or Web Standard fetch event handlers.\n- Offload asset storage to R2 buckets.'
+      },
+      {
+        name: 'agent-memory',
+        category: 'ai-agents',
+        tokens: 1540,
+        desc: 'Hybrid persistent memory architecture for AI agents: short-term buffers, session recall, and topic distillation.',
+        tags: ['memory', 'agents', 'persistence'],
+        content: '# Agent Memory Skill\n\nManage long-running agent state across context compactions and multiple conversation sessions.\n\n## Architecture\n- Passive Memory Capture: Extract decisions into persistent storage.\n- Compaction Recovery: Restore active session goals.'
+      },
+      {
+        name: 'database-admin',
+        category: 'backend',
+        tokens: 1480,
+        desc: 'PostgreSQL, SQLite, and MySQL database administration: indexing strategies and query plan EXPLAIN analysis.',
+        tags: ['database', 'postgresql', 'sql', 'indexes'],
+        content: '# Database Admin Skill\n\nEnsure database reliability, high transaction throughput, and data integrity under heavy loads.'
+      }
+    ];
+
+    let currentClient = 'claude';
+    let currentCategory = 'all';
+
+    function getBaseUrl() {
+      if (typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null') {
+        return window.location.origin;
+      }
+      return 'https://your-skillyfiy.vercel.app';
+    }
+
+    function updateEndpoints() {
+      const base = getBaseUrl();
+      const endpoint = base + '/api/mcp';
+      document.getElementById('endpoint-display').textContent = endpoint;
+      document.querySelectorAll('.current-url').forEach(el => el.textContent = base);
+      renderConfigSnippet();
+    }
+
+    function selectClient(client) {
+      currentClient = client;
+      document.querySelectorAll('.client-tab').forEach(b => {
+        b.classList.remove('border-emerald-500', 'bg-emerald-950/40', 'text-emerald-300');
+        b.classList.add('border-gray-800', 'bg-gray-900', 'text-gray-300');
+      });
+      const activeBtn = document.getElementById('tab-' + client);
+      if (activeBtn) {
+        activeBtn.classList.remove('border-gray-800', 'bg-gray-900', 'text-gray-300');
+        activeBtn.classList.add('border-emerald-500', 'bg-emerald-950/40', 'text-emerald-300');
+      }
+      renderConfigSnippet();
+    }
+
+    function renderConfigSnippet() {
+      const endpoint = getBaseUrl() + '/api/mcp';
+      const pathLabel = document.getElementById('config-path-label');
+      const codeBlock = document.getElementById('config-code-block');
+
+      let code = '';
+      if (currentClient === 'claude') {
+        pathLabel.textContent = 'Config Location: ~/Library/Application Support/Claude/claude_desktop_config.json';
+        code = JSON.stringify({
+          mcpServers: {
+            skillyfiy: {
+              url: endpoint
+            }
+          }
+        }, null, 2);
+      } else if (currentClient === 'cursor') {
+        pathLabel.textContent = 'Config Location: .cursor/mcp.json (or Cursor Settings -> MCP)';
+        code = JSON.stringify({
+          mcpServers: {
+            skillyfiy: {
+              url: endpoint
+            }
+          }
+        }, null, 2);
+      } else if (currentClient === 'antigravity') {
+        pathLabel.textContent = 'Config Location: ~/.gemini/antigravity-cli/mcp_config.json';
+        code = JSON.stringify({
+          skillyfiy: {
+            url: endpoint
+          }
+        }, null, 2);
+      } else if (currentClient === 'claudecode') {
+        pathLabel.textContent = 'Terminal Command: Run in shell';
+        code = `claude mcp add --transport sse skillyfiy ${endpoint}`;
+      } else if (currentClient === 'windsurf') {
+        pathLabel.textContent = 'Config Location: ~/.codeium/windsurf/mcp_config.json';
+        code = JSON.stringify({
+          mcpServers: {
+            skillyfiy: {
+              serverUrl: endpoint
+            }
+          }
+        }, null, 2);
+      } else {
+        pathLabel.textContent = 'Config Location: cline_mcp_settings.json';
+        code = JSON.stringify({
+          mcpServers: {
+            skillyfiy: {
+              url: endpoint
+            }
+          }
+        }, null, 2);
+      }
+
+      codeBlock.textContent = code;
+    }
+
+    function copyEndpoint() {
+      const endpoint = document.getElementById('endpoint-display').textContent;
+      navigator.clipboard.writeText(endpoint);
+      const btn = document.getElementById('copy-endpoint-btn');
+      btn.innerHTML = '✓ Copied!';
+      setTimeout(() => {
+        btn.innerHTML = `<svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Copy Endpoint`;
+      }, 2000);
+    }
+
+    function copyConfig() {
+      const code = document.getElementById('config-code-block').textContent;
+      navigator.clipboard.writeText(code);
+      const btn = document.getElementById('copy-config-btn');
+      btn.innerHTML = '✓ Copied!';
+      setTimeout(() => {
+        btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Copy Snippet`;
+      }, 2000);
+    }
+
+    function copyAgentPrompt() {
+      const text = document.getElementById('agent-prompt-text').textContent;
+      navigator.clipboard.writeText(text);
+      const btn = document.getElementById('copy-prompt-btn');
+      btn.innerHTML = '✓ Copied!';
+      setTimeout(() => {
+        btn.innerHTML = 'Copy Prompt';
+      }, 2000);
+    }
+
+    function filterCategory(cat) {
+      currentCategory = cat;
+      document.querySelectorAll('.cat-pill').forEach(b => {
+        b.classList.remove('border-emerald-500', 'bg-emerald-950/60', 'text-emerald-300');
+        b.classList.add('border-gray-800', 'bg-gray-900', 'text-gray-400');
+      });
+      event.target.classList.remove('border-gray-800', 'bg-gray-900', 'text-gray-400');
+      event.target.classList.add('border-emerald-500', 'bg-emerald-950/60', 'text-emerald-300');
+      filterCatalog();
+    }
+
+    function filterCatalog() {
+      const q = document.getElementById('search-input').value.toLowerCase().trim();
+      const grid = document.getElementById('skills-grid');
+      grid.innerHTML = '';
+
+      const filtered = CATALOG.filter(item => {
+        const matchesCat = currentCategory === 'all' || item.category === currentCategory;
+        const matchesQuery = !q || item.name.includes(q) || item.desc.toLowerCase().includes(q) || item.tags.some(t => t.includes(q));
+        return matchesCat && matchesQuery;
+      });
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div class="col-span-2 text-center py-8 text-gray-500">No skills matching query.</div>';
+        return;
+      }
+
+      filtered.forEach(skill => {
+        const card = document.createElement('div');
+        card.className = 'bg-gray-900/90 border border-gray-800 rounded-xl p-5 hover:border-gray-700 transition flex flex-col justify-between space-y-3';
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <span class="font-mono font-bold text-emerald-400">${skill.name}</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-300 font-mono">~${skill.tokens} tk</span>
+            </div>
+            <p class="text-gray-400 text-xs leading-relaxed">${skill.desc}</p>
+          </div>
+          <div class="flex items-center justify-between pt-2 border-t border-gray-800/80">
+            <div class="flex flex-wrap gap-1">
+              ${skill.tags.map(t => `<span class="text-[10px] px-2 py-0.5 rounded bg-gray-950 text-gray-400 border border-gray-800">#${t}</span>`).join('')}
+            </div>
+            <button onclick="openDocModal('${skill.name}')" class="text-xs font-semibold text-cyan-400 hover:text-cyan-300">Read Doc →</button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function openDocModal(name) {
+      const skill = CATALOG.find(s => s.name === name);
+      if (!skill) return;
+      document.getElementById('modal-skill-title').textContent = skill.name;
+      document.getElementById('modal-skill-body').textContent = skill.content;
+      document.getElementById('doc-modal').classList.remove('hidden');
+    }
+
+    function closeDocModal() {
+      document.getElementById('doc-modal').classList.add('hidden');
+    }
+
+    // Initialize on load
+    updateEndpoints();
+    filterCatalog();
+  </script>
+</body>
+</html>

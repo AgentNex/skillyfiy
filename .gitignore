@@ -4,3 +4,5 @@ dist/
 *.bak
 *.exe
 testsprite_tests/
+node_modules/
+.vercel/
