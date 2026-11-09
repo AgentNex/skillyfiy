@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"runtime"
@@ -26,6 +27,12 @@ func main() {
 	}
 
 	cfg.Version = Version
+
+	// Check for non-interactive subcommands
+	if len(flag.Args()) > 0 && flag.Args()[0] == "list" {
+		code := engine.RunList(cfg, os.Stdout, os.Stderr, flag.Args()[1:]...)
+		os.Exit(code)
+	}
 
 	// 1. Discover Skills
 	var allItems []model.AgentItem

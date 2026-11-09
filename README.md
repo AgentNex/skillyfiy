@@ -152,6 +152,10 @@ Launch directly with `sky` (or `skillyfiy`):
 # Launch interactive TUI
 sky
 
+# List all discovered skills and MCP servers non-interactively
+skillyfiy list
+sky list
+
 # Print version information
 sky -v
 sky --version

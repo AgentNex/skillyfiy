@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"skillyfiy/internal/config"
 	"skillyfiy/internal/engine"
 )
 
@@ -70,5 +71,37 @@ func TestPrintSummaryCard(t *testing.T) {
 	}
 	if !strings.Contains(outDry, "Permission denied") {
 		t.Errorf("Expected error message in output, got: %s", outDry)
+	}
+}
+
+func TestListCommandOutput(t *testing.T) {
+	tempDir := t.TempDir()
+	skillsDir := tempDir + "/skills"
+	os.MkdirAll(skillsDir, 0755)
+	os.WriteFile(skillsDir+"/test.md", []byte("# Skill"), 0644)
+
+	mcpPath := tempDir + "/settings.json"
+	os.WriteFile(mcpPath, []byte(`{"mcpServers": {"test-mcp": {"command": "echo"}}}`), 0644)
+
+	var stdout, stderr bytes.Buffer
+	cfg := &config.Config{
+		SkillsPath: skillsDir,
+		MCPPath:    mcpPath,
+	}
+
+	code := engine.RunList(cfg, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("Expected 0, got %d. Stderr: %s", code, stderr.String())
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "Skillyfiy — Inventory") {
+		t.Errorf("Expected header in output, got: %s", out)
+	}
+	if !strings.Contains(out, "1. test.md") {
+		t.Errorf("Expected skill test.md in output, got: %s", out)
+	}
+	if !strings.Contains(out, "1. test-mcp") {
+		t.Errorf("Expected mcp test-mcp in output, got: %s", out)
 	}
 }

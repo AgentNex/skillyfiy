@@ -54,6 +54,14 @@ func ParseMCP(manifestPath string) ([]model.AgentItem, error) {
 		return nil, fmt.Errorf("failed to read MCP manifest: %w", err)
 	}
 
+	trimmed := strings.TrimSpace(string(data))
+	if len(trimmed) == 0 {
+		return items, nil
+	}
+	if !json.Valid(data) {
+		return nil, fmt.Errorf("invalid JSON in MCP manifest: %s", manifestPath)
+	}
+
 	parsed := gjson.ParseBytes(data)
 	mcpServers := parsed.Get("mcpServers")
 
