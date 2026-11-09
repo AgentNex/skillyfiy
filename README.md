@@ -17,7 +17,7 @@
 Accumulating hundreds of agent skills and MCP servers pollutes context windows, degrades reasoning performance, and inflates system prompt token costs. **Skillyfiy** provides an interactive, split-pane Terminal User Interface (TUI) designed to browse, inspect, and bulk-prune agent overhead with sub-millisecond responsiveness.
 
 ```
-┌── SKILLYFIY [sky] v0.3.0 ──────────────────────┬───────────────────────────────┐
+┌── SKILLYFIY [sky] v0.4.0 ──────────────────────┬───────────────────────────────┐
 │ / Search: [ scraper           ] [Sort] [Filter]│ INSPECTOR                     │
 ├────────────────────────────────────────────────┼───────────────────────────────┤
 │ ▶ [✓] [SKILL] web_scraper.py           1.2 KB  │ Target: web_scraper.py        │
@@ -63,6 +63,30 @@ Install the Skillyfiy (sky) CLI tool on my system:
 ```
 
 </details>
+
+## 🔄 Updating to the Latest Version
+
+If you have already installed an older version of Skillyfiy (`sky`), you can update to the latest release at any time:
+
+### Method 1: Re-run 1-Line Installer (Recommended)
+Simply re-run the universal installer. It will automatically detect your OS and architecture, download the latest release binary from GitHub, and safely replace your existing executable:
+```bash
+curl -fsSL https://raw.githubusercontent.com/AgentNex/skillyfiy/main/install.sh | bash
+```
+
+### Method 2: Go Toolchain
+If you installed using Go, fetch and compile the latest release:
+```bash
+go install github.com/AgentNex/skillyfiy@latest
+```
+
+### Verify Your Version
+Verify that your installation is up to date:
+```bash
+sky -v
+# or
+skillyfiy -v
+```
 
 ## 🌈 Gradient Animation
 
